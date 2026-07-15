@@ -88,6 +88,8 @@ export function renderPengaturan(){
       try {
         const parsed = JSON.parse(evt.target.result);
         if(parsed && typeof parsed.settings === 'object' && Array.isArray(parsed.siswa) && Array.isArray(parsed.pembayaran)) {
+           const d = defaultState();
+           parsed.settings = Object.assign({}, d.settings, parsed.settings);
            store.state = parsed;
            store.isDataCorrupt = false;
            saveData('Data berhasil dipulihkan dari backup');

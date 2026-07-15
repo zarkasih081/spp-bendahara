@@ -48,8 +48,21 @@ export function render(){
       return render();
     }
     const meta = PAGE_META[store.ui.page] || { title: '', sub: '' };
-    document.getElementById('page-title').textContent = meta.title;
-    document.getElementById('page-sub').textContent = meta.sub;
+    let pageTitle = meta.title;
+    let pageSub = meta.sub;
+    
+    if (role === 'siswa') {
+      if (store.ui.page === 'dashboard') {
+        pageTitle = 'Dashboard Siswa';
+        pageSub = 'Ringkasan tagihan dan informasi SPP Anda';
+      } else if (store.ui.page === 'riwayat') {
+        pageTitle = 'Riwayat Pembayaran';
+        pageSub = 'Detail transaksi dan status SPP Anda';
+      }
+    }
+    
+    document.getElementById('page-title').textContent = pageTitle;
+    document.getElementById('page-sub').textContent = pageSub;
     document.getElementById('today-label').innerHTML = `
       <div style="display:flex; align-items:center; gap:14px; margin-bottom:4px;">
         <span style="font-size:12.5px; font-weight:600; color:var(--ink);">Tahun Ajaran ${renderTahunAjaranSelector('global-ta')}</span>
