@@ -39,7 +39,7 @@ export function renderDashboard(){
         <div style="display:flex; flex-direction:column; gap:8px; margin-top:12px; font-size:14px;">
           <div><strong>Nama:</strong> ${escapeHtml(s.nama)}</div>
           <div><strong>Kelas:</strong> ${escapeHtml(s.kelas)}</div>
-          <div><strong>Nominal SPP:</strong> ${fmtRupiah(store.state.settings.nominalSpp)} / bulan</div>
+          <div><strong>Nominal SPP:</strong> ${fmtRupiah(store.state.settings.nominalSPP)} / bulan</div>
         </div>
       </div>
       <div class="stat-row">

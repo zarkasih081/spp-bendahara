@@ -15,6 +15,11 @@ export function renderPengaturan(){
         <div class="form-group"><label>Nama Bendahara</label><input id="set-bendahara" style="width:100%;" value="${escapeAttr(s.bendahara)}" placeholder="Tercetak di kwitansi"></div>
         <div class="form-group"><label>Tahun Ajaran</label><input id="set-ta" style="width:100%;" value="${escapeAttr(s.tahunAjaran)}" placeholder="cth. 2025/2026"></div>
       </div>
+      <div class="form-group" style="margin-top: 14px;">
+        <label>Kata Sandi (PIN) Bendahara</label>
+        <input id="set-admin-pass" type="text" style="width:100%;" value="${escapeAttr(s.adminPassword || 'admin')}">
+        <div class="helper-text">Digunakan untuk login sebagai Bendahara.</div>
+      </div>
     </div>
     <div class="card" style="max-width:560px;">
       <h3>Nominal & Periode SPP</h3>
@@ -53,6 +58,7 @@ export function renderPengaturan(){
     s.namaSekolah = document.getElementById('set-nama').value.trim() || s.namaSekolah;
     s.bendahara = document.getElementById('set-bendahara').value.trim();
     s.tahunAjaran = document.getElementById('set-ta').value.trim() || s.tahunAjaran;
+    s.adminPassword = document.getElementById('set-admin-pass').value.trim() || s.adminPassword;
     s.nominalSPP = parseInt(document.getElementById('set-nominal').value || '0',10) || s.nominalSPP;
     s.bulanMulai = +document.getElementById('set-bulan-mulai').value;
     s.tahunMulai = parseInt(document.getElementById('set-tahun-mulai').value,10) || s.tahunMulai;
