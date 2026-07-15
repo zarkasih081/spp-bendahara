@@ -731,3 +731,12 @@ td.num, th.num{ text-align:right; font-family:'IBM Plex Mono',monospace; }
 nav::-webkit-scrollbar { width: 4px; }
 nav::-webkit-scrollbar-track { background: transparent; }
 nav::-webkit-scrollbar-thumb { background: rgba(239,233,216,.15); border-radius: 2px; }
+
+/* Login Page CSS */
+.login-container { display: flex; justify-content: center; align-items: center; height: 100vh; background-color: var(--paper-dim); }
+.login-card { background: #fff; padding: 32px; border-radius: var(--radius-lg); box-shadow: var(--shadow-lg); width: 100%; max-width: 400px; }
+.login-tabs { display: flex; border-bottom: 1px solid var(--line); margin-bottom: 24px; }
+.login-tab { flex: 1; text-align: center; padding: 12px; cursor: pointer; background: none; border: none; font-size: 14px; font-weight: 500; color: var(--ink-soft); }
+.login-tab.active { color: var(--green); border-bottom: 2px solid var(--green); }
+.login-form { display: none; }
+.login-form.active { display: block; }
