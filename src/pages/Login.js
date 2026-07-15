@@ -3,8 +3,8 @@ import { triggerRender } from '../utils/events.js';
 import { escapeHtml, toast } from '../utils/helpers.js';
 
 export function renderLogin() {
-  const app = document.getElementById('app');
-  app.innerHTML = `
+  const loginPage = document.getElementById('page-login');
+  loginPage.innerHTML = `
     <div class="login-container">
       <div class="login-card">
         <h2 style="text-align:center; margin-bottom: 24px;">Login SPP Bendahara</h2>
@@ -37,8 +37,8 @@ export function renderLogin() {
     </div>
   `;
 
-  const tabs = app.querySelectorAll('.login-tab');
-  const forms = app.querySelectorAll('.login-form');
+  const tabs = loginPage.querySelectorAll('.login-tab');
+  const forms = loginPage.querySelectorAll('.login-form');
   
   tabs.forEach(tab => {
     tab.addEventListener('click', (e) => {
@@ -47,7 +47,7 @@ export function renderLogin() {
       
       e.target.classList.add('active');
       const role = e.target.dataset.role;
-      app.querySelector(`#form-login-${role}`).classList.add('active');
+      loginPage.querySelector(`#form-login-${role}`).classList.add('active');
     });
   });
 
@@ -83,7 +83,7 @@ export function renderLogin() {
     }
 
     // Default PIN is NIS if not explicitly set
-    const correctPin = siswa.password || siswa.nis;
+    const correctPin = siswa.pin || siswa.nis;
     if(pin === correctPin) {
       store.ui.currentUser = { role: 'siswa', id: siswa.id, nama: siswa.nama };
       store.ui.page = 'dashboard';
