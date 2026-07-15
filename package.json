@@ -1,0 +1,19 @@
+{
+  "name": "spp-bendahara",
+  "version": "1.0.0",
+  "description": "Aplikasi Bendahara SPP Sekolah",
+  "main": "index.js",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build"
+  },
+  "keywords": [],
+  "author": "Irhas",
+  "license": "ISC",
+  "type": "module",
+  "devDependencies": {
+    "vite": "^8.1.4",
+    "vite-plugin-singlefile": "^2.3.3",
+    "xlsx": "^0.18.5"
+  }
+}

@@ -1,0 +1,144 @@
+import { store } from '../state/store.js';
+import { currentPeriodeEntry, siswaStatusBulan, siswaTunggakan, fmtRupiah, escapeHtml, BULAN, emptyState } from '../utils/helpers.js';
+import { triggerRender } from '../utils/events.js';
+
+function iconMoney(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>`; }
+function iconUserCheck(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 014-4h6a4 4 0 014 4v2"/><path d="M16 11l2 2 4-4"/></svg>`; }
+function iconAlertTri(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>`; }
+function iconWallet(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M16 12h.01M2 10h20"/></svg>`; }
+function iconEmptyUsers(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path><circle cx="9" cy="7" r="4"></circle><path d="M23 21v-2a4 4 0 0 0-3-3.87"></path><path d="M16 3.13a4 4 0 0 1 0 7.75"></path></svg>`; }
+
+
+
+function renderTopTunggakan(){
+  const rows = store.state.siswa.map(s=>({ s, t: siswaTunggakan(s.id) }))
+    .filter(r=>r.t.totalKurang>0)
+    .sort((a,b)=>b.t.totalKurang-a.t.totalKurang)
+    .slice(0,6);
+  if(rows.length===0) return `<div class="empty-state" style="padding:24px;"><p>Semua siswa lunas sampai bulan berjalan. Kerja bagus, Bu/Pak Bendahara. 🎉</p></div>`;
+  return `<div class="table-scroll"><table><thead><tr><th>Nama</th><th>Kelas</th><th class="num">Bulan Tertunggak</th><th class="num">Kekurangan</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr><td>${escapeHtml(r.s.nama)}</td><td><span class="kelas-chip">${escapeHtml(r.s.kelas)}</span></td><td class="num">${r.t.jumlahBulan}</td><td class="num">${fmtRupiah(r.t.totalKurang)}</td></tr>`).join('')}
+  </tbody></table></div>`;
+}
+
+export function renderDashboard(){
+  const el = document.getElementById('page-dashboard');
+  const user = store.ui.currentUser;
+
+  // VIEW FOR SISWA
+  if (user && user.role === 'siswa') {
+    const s = store.state.siswa.find(x => x.id === user.id);
+    if (!s) {
+      el.innerHTML = `<div class="empty-state">Data siswa tidak ditemukan.</div>`;
+      return;
+    }
+    const tunggakan = siswaTunggakan(s.id);
+    el.innerHTML = `
+      <div class="card" style="margin-bottom:16px;">
+        <h3>Informasi Siswa</h3>
+        <div style="display:flex; flex-direction:column; gap:8px; margin-top:12px; font-size:14px;">
+          <div><strong>Nama:</strong> ${escapeHtml(s.nama)}</div>
+          <div><strong>Kelas:</strong> ${escapeHtml(s.kelas)}</div>
+          <div><strong>Nominal SPP:</strong> ${fmtRupiah(store.state.settings.nominalSpp)} / bulan</div>
+        </div>
+      </div>
+      <div class="stat-row">
+        <div class="stat-card rust">
+          <div class="stat-icon">${iconAlertTri()}</div>
+          <div class="label">Bulan Tertunggak</div>
+          <div class="value">${tunggakan.jumlahBulan} Bulan</div>
+          <div class="foot">Bulan belum dibayar (hingga bulan berjalan)</div>
+        </div>
+        <div class="stat-card rust">
+          <div class="stat-icon">${iconWallet()}</div>
+          <div class="label">Kekurangan Pembayaran</div>
+          <div class="value">${fmtRupiah(tunggakan.totalKurang)}</div>
+          <div class="foot">Total yang harus dilunasi</div>
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  // VIEW FOR BENDAHARA
+  const cur = currentPeriodeEntry();
+  const totalSiswa = store.state.siswa.length;
+  
+  const totalMasukBulanIni = store.state.pembayaran
+    .filter(p=>p.bulan===cur.bulan && p.tahun===cur.tahun)
+    .reduce((a,p)=>a+p.nominal,0);
+
+  let lunasCount = 0, parsialCount = 0, nunggakCount = 0;
+  store.state.siswa.forEach(s=>{
+    const st = siswaStatusBulan(s.id, cur.bulan, cur.tahun);
+    if(st==='lunas') lunasCount++; else if(st==='parsial') parsialCount++; else nunggakCount++;
+  });
+
+  let totalPiutang = 0;
+  store.state.siswa.forEach(s=>{ totalPiutang += siswaTunggakan(s.id).totalKurang; });
+
+  const now = new Date();
+  const months = [];
+  for(let i=5;i>=0;i--){
+    const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
+    months.push({ bulan: d.getMonth()+1, tahun: d.getFullYear() });
+  }
+  const totals = months.map(m => store.state.pembayaran.filter(p=>p.bulan===m.bulan && p.tahun===m.tahun).reduce((a,p)=>a+p.nominal,0));
+  const maxTotal = Math.max(...totals, 1);
+
+  if(totalSiswa===0){
+    el.innerHTML = emptyState(iconEmptyUsers(), 'Belum ada data siswa', 'Tambahkan data siswa terlebih dahulu di menu Data Siswa untuk mulai mencatat pembayaran SPP.', 'Tambah Data Siswa', () => {
+      store.ui.page = 'siswa';
+      triggerRender();
+    });
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="stat-row">
+      <div class="stat-card gold">
+        <div class="stat-icon">${iconMoney()}</div>
+        <div class="label">Masuk Bulan ${BULAN[cur.bulan-1]}</div>
+        <div class="value">${fmtRupiah(totalMasukBulanIni)}</div>
+        <div class="foot">dari ${store.state.pembayaran.filter(p=>p.bulan===cur.bulan&&p.tahun===cur.tahun).length} transaksi</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-icon">${iconUserCheck()}</div>
+        <div class="label">Siswa Lunas Bulan Ini</div>
+        <div class="value">${lunasCount} <span style="font-size:13px;color:var(--ink-soft);font-weight:400;">/ ${totalSiswa}</span></div>
+        <div class="foot">${totalSiswa? Math.round(lunasCount/totalSiswa*100):0}% dari total siswa</div>
+      </div>
+      <div class="stat-card rust">
+        <div class="stat-icon">${iconAlertTri()}</div>
+        <div class="label">Belum / Kurang Bayar</div>
+        <div class="value">${nunggakCount+parsialCount}</div>
+        <div class="foot">${nunggakCount} belum bayar · ${parsialCount} sebagian</div>
+      </div>
+      <div class="stat-card rust">
+        <div class="stat-icon">${iconWallet()}</div>
+        <div class="label">Total Piutang Berjalan</div>
+        <div class="value">${fmtRupiah(totalPiutang)}</div>
+        <div class="foot">akumulasi tunggakan tahun ajaran ini</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Tren Pemasukan 6 Bulan Terakhir</h3>
+      <div class="card-sub">Total SPP diterima per bulan</div>
+      <div class="chart-wrap">
+        ${months.map((m,i)=>`
+          <div class="bar-col">
+            <span class="amt">${totals[i]>0? fmtRupiah(totals[i]).replace('Rp',''):''}</span>
+            <div class="bar" style="height:${Math.max(4, totals[i]/maxTotal*100)}%"></div>
+            <span class="lbl">${BULAN[m.bulan-1].slice(0,3)}</span>
+          </div>`).join('')}
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Perlu Ditindaklanjuti</h3>
+      <div class="card-sub">Siswa dengan tunggakan terbesar tahun ajaran ${store.state.settings.tahunAjaran}</div>
+      ${renderTopTunggakan()}
+    </div>
+  `;
+}
