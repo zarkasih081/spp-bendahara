@@ -32,11 +32,11 @@ export function render(){
     }
     store.ui.page = 'login';
     document.querySelector('.sidebar').style.display = 'none';
-    document.querySelector('header').style.display = 'none';
+    document.querySelector('.topbar').style.display = 'none';
     document.querySelector('.main').style.marginLeft = '0';
   } else {
     document.querySelector('.sidebar').style.display = '';
-    document.querySelector('header').style.display = '';
+    document.querySelector('.topbar').style.display = '';
     document.querySelector('.main').style.marginLeft = '';
   }
 
