@@ -12,6 +12,15 @@ import { renderLaporan } from './pages/Laporan.js';
 import { renderPengaturan } from './pages/Pengaturan.js';
 import { renderLogin } from './pages/Login.js';
 
+// Global PWA Install Prompt
+window.deferredPrompt = null;
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault();
+  window.deferredPrompt = e;
+  const btnInstall = document.getElementById('btn-install');
+  if (btnInstall) btnInstall.style.display = 'inline-flex';
+});
+
 function renderTahunAjaranSelector(id){
   const current = getActiveTahunMulai();
   const base = store.state.settings.tahunMulai || new Date().getFullYear();
@@ -34,10 +43,18 @@ export function render(){
     document.querySelector('.sidebar').style.display = 'none';
     document.querySelector('.topbar').style.display = 'none';
     document.querySelector('.main').style.marginLeft = '0';
+    document.querySelector('.main').style.padding = '0';
+    document.body.classList.remove('role-siswa');
   } else {
     document.querySelector('.sidebar').style.display = '';
     document.querySelector('.topbar').style.display = '';
     document.querySelector('.main').style.marginLeft = '';
+    document.querySelector('.main').style.padding = '';
+    if (role === 'siswa') {
+      document.body.classList.add('role-siswa');
+    } else {
+      document.body.classList.remove('role-siswa');
+    }
   }
 
   renderNav();

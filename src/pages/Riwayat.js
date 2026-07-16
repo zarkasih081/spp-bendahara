@@ -34,22 +34,24 @@ export function renderRiwayat(){
         </div>
       </div>
       
-      <div class="card">
+      <div class="card" style="margin-top:16px;">
         <h3>Riwayat Transaksi</h3>
         ${payments.length === 0 ? '<div class="empty-state">Belum ada transaksi pembayaran.</div>' : `
-          <div class="table-scroll" style="margin-top:12px;">
-            <table>
-              <thead><tr><th>Tanggal</th><th>Pembayaran Untuk</th><th class="num">Nominal</th></tr></thead>
-              <tbody>
-                ${payments.map(p=>`
-                  <tr>
-                    <td>${new Date(p.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'short', year:'numeric'})}</td>
-                    <td>Bulan ${BULAN[p.bulan-1]} ${p.tahun}</td>
-                    <td class="num">${fmtRupiah(p.nominal)}</td>
-                  </tr>
-                `).join('')}
-              </tbody>
-            </table>
+          <div class="transaction-list" style="margin-top:16px;">
+            ${payments.map(p=>`
+              <div class="transaction-item">
+                <div class="ti-left">
+                  <div class="ti-icon">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                  </div>
+                  <div>
+                    <div class="ti-title">SPP Bulan ${BULAN[p.bulan-1]} ${p.tahun}</div>
+                    <div class="ti-date">${new Date(p.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</div>
+                  </div>
+                </div>
+                <div class="ti-amount">+ ${fmtRupiah(p.nominal)}</div>
+              </div>
+            `).join('')}
           </div>
         `}
       </div>
@@ -123,7 +125,10 @@ export function renderRiwayat(){
       <td><span class="badge ${r.st}">${r.st==='lunas'?'Lunas':r.st==='parsial'?'Sebagian':'Belum Bayar'}</span></td>
       <td class="num">${r.t.jumlahBulan}</td>
       <td class="num">${fmtRupiah(r.t.totalKurang)}</td>
-      <td><button class="btn btn-sm btn-ghost" data-detail="${r.s.id}">Detail</button></td>
+      <td style="display:flex; gap:4px; justify-content:flex-end;">
+        ${r.s.noHp && r.t.totalKurang > 0 ? `<button class="btn btn-sm btn-ghost" style="color:#25D366;" data-wa-tagihan="${r.s.id}" title="Kirim Tagihan WA"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></button>` : ''}
+        <button class="btn btn-sm btn-ghost" data-detail="${r.s.id}">Detail</button>
+      </td>
     </tr>`).join('');
   }
 
@@ -145,6 +150,15 @@ export function renderRiwayat(){
   document.getElementById('riwayat-kelas-filter').addEventListener('change', e=>{ store.ui.riwayatKelasFilter=e.target.value; store.ui.pageRiwayat=1; renderRiwayat(); });
   document.getElementById('riwayat-status-filter').addEventListener('change', e=>{ store.ui.riwayatStatusFilter=e.target.value; store.ui.pageRiwayat=1; renderRiwayat(); });
   tbody.querySelectorAll('[data-detail]').forEach(b=>b.addEventListener('click', ()=>openDetailSiswa(b.dataset.detail)));
+  tbody.querySelectorAll('[data-wa-tagihan]').forEach(b=>b.addEventListener('click', ()=>{
+    const id = b.dataset.waTagihan;
+    const s = store.state.siswa.find(x=>x.id===id);
+    const t = siswaTunggakan(id);
+    const bulanTeks = t.bulanBelum.map(m=>`- ${BULAN[m.bulan-1]} ${m.tahun} (Kurang: ${fmtRupiah(m.kurang)})`).join('\n');
+    const teks = `Halo Bapak/Ibu,\n\nKami menginformasikan bahwa terdapat tunggakan pembayaran SPP atas nama *${s.nama}* (Kelas ${s.kelas}).\n\nRincian Tunggakan:\n${bulanTeks}\n\n*Total Tunggakan: ${fmtRupiah(t.totalKurang)}*\n\nMohon untuk segera melakukan pembayaran. Jika sudah membayar, abaikan pesan ini.\n\nTerima kasih,\nBendahara ${store.state.settings.namaSekolah}`;
+    const url = formatWaLink(s.noHp, teks);
+    window.open(url, '_blank');
+  }));
 }
 
 function openDetailSiswa(id){

@@ -1,4 +1,4 @@
-import { store } from '../state/store.js';
+import { store, saveAuth } from '../state/store.js';
 import { triggerRender } from '../utils/events.js';
 
 export const PAGE_META = {
@@ -32,35 +32,69 @@ export const NAV_ITEMS = [
 export function renderNav(){
   const sidebar = document.querySelector('.sidebar');
   const nav = document.getElementById('nav');
+  const bottomNav = document.getElementById('bottom-nav');
   let html = '';
   let lastGroup = null;
   
   const user = store.ui.currentUser;
-  let items = NAV_ITEMS;
+  
   if (user && user.role === 'siswa') {
-    items = [
-      { key:'dashboard', label:'Ringkasan SPP', group:'SPP Saya', icon:iconGrid() },
-      { key:'riwayat', label:'Riwayat Pembayaran', group:'SPP Saya', icon:iconClock() }
-    ];
-  }
+    // Render Bottom Nav for Siswa
+    bottomNav.style.display = 'flex';
+    nav.innerHTML = '';
+    
+    let bottomHtml = `
+      <div class="bottom-nav-item ${store.ui.page==='dashboard'?'active':''}" data-bottom-nav="dashboard">
+        ${iconGrid()}
+        <span>Beranda</span>
+      </div>
+      <div class="bottom-nav-item ${store.ui.page==='riwayat'?'active':''}" data-bottom-nav="riwayat">
+        ${iconClock()}
+        <span>Riwayat</span>
+      </div>
+      <div class="bottom-nav-item logout" id="btn-bottom-logout">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg>
+        <span>Keluar</span>
+      </div>
+    `;
+    bottomNav.innerHTML = bottomHtml;
+    
+    document.getElementById('btn-bottom-logout').addEventListener('click', () => {
+      store.ui.currentUser = null;
+      store.ui.page = 'login';
+      saveAuth(null);
+      triggerRender();
+    });
+    
+    bottomNav.querySelectorAll('[data-bottom-nav]').forEach(el=>{
+      el.addEventListener('click', ()=>{
+        store.ui.page = el.dataset.bottomNav;
+        triggerRender();
+      });
+    });
 
-  items.forEach(item=>{
-    if(item.group !== lastGroup){ html += `<div class="nav-label">${item.group}</div>`; lastGroup = item.group; }
-    html += `<div class="nav-item ${store.ui.page===item.key?'active':''}" data-nav="${item.key}" data-tooltip="${item.label}">${item.icon}<span class="txt">${item.label}</span></div>`;
-  });
-  
-  // Add logout button at the end
-  html += `<div class="nav-label">Sistem</div>`;
-  html += `<div class="nav-item" id="btn-logout" data-tooltip="Keluar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span class="txt">Keluar (${user ? user.nama : ''})</span></div>`;
+  } else {
+    // Render Sidebar Nav for Bendahara
+    if (bottomNav) bottomNav.style.display = 'none';
+    let items = NAV_ITEMS;
+    
+    items.forEach(item=>{
+      if(item.group !== lastGroup){ html += `<div class="nav-label">${item.group}</div>`; lastGroup = item.group; }
+      html += `<div class="nav-item ${store.ui.page===item.key?'active':''}" data-nav="${item.key}" data-tooltip="${item.label}">${item.icon}<span class="txt">${item.label}</span></div>`;
+    });
+    
+    html += `<div class="nav-label">Sistem</div>`;
+    html += `<div class="nav-item" id="btn-logout" data-tooltip="Keluar"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9"/></svg><span class="txt">Keluar (${user ? user.nama : ''})</span></div>`;
 
-  nav.innerHTML = html;
-  
-  // Handle logout click
-  document.getElementById('btn-logout').addEventListener('click', () => {
-    store.ui.currentUser = null;
-    store.ui.page = 'login';
-    triggerRender();
-  });
+    nav.innerHTML = html;
+    
+    document.getElementById('btn-logout').addEventListener('click', () => {
+      store.ui.currentUser = null;
+      store.ui.page = 'login';
+      saveAuth(null);
+      triggerRender();
+    });
+  } // End of else
 
   nav.querySelectorAll('[data-nav]').forEach(el=>{
     el.addEventListener('click', ()=>{

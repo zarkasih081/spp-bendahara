@@ -84,6 +84,7 @@ export function renderBayar(){
     e.target.dataset.touched = '1';
     updateNominalHint(nominal);
   });
+  document.getElementById('bayar-nominal').addEventListener('focus', e=> e.target.select());
   document.getElementById('btn-simpan-bayar').addEventListener('click', ()=>simpanPembayaran(nominal));
 }
 

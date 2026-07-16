@@ -1,5 +1,5 @@
 import { store } from '../state/store.js';
-import { currentPeriodeEntry, siswaStatusBulan, siswaTunggakan, fmtRupiah, escapeHtml, BULAN, emptyState } from '../utils/helpers.js';
+import { currentPeriodeEntry, siswaStatusBulan, siswaTunggakan, fmtRupiah, escapeHtml, BULAN, emptyState, getPeriode, siswaTotalBulan } from '../utils/helpers.js';
 import { triggerRender } from '../utils/events.js';
 
 function iconMoney(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>`; }
@@ -33,28 +33,68 @@ export function renderDashboard(){
       return;
     }
     const tunggakan = siswaTunggakan(s.id);
+    const periode = getPeriode();
+    const nominal = store.state.settings.nominalSPP;
+    
+    const lunasCount = periode.filter(p => siswaTotalBulan(s.id, p.bulan, p.tahun) >= nominal).length;
+    const progressPercent = Math.round((lunasCount / 12) * 100);
+
     el.innerHTML = `
-      <div class="card" style="margin-bottom:16px;">
-        <h3>Informasi Siswa</h3>
-        <div style="display:flex; flex-direction:column; gap:8px; margin-top:12px; font-size:14px;">
-          <div><strong>Nama:</strong> ${escapeHtml(s.nama)}</div>
-          <div><strong>Kelas:</strong> ${escapeHtml(s.kelas)}</div>
-          <div><strong>Nominal SPP:</strong> ${fmtRupiah(store.state.settings.nominalSPP)} / bulan</div>
+      <div class="virtual-card">
+        <div class="vc-header">
+          <div class="vc-title">Kartu SPP Digital</div>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.7)" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        </div>
+        <div class="vc-body">
+          <div class="vc-name">${escapeHtml(s.nama)}</div>
+          <div class="vc-nis">${escapeHtml(s.nis || 'NIS Belum Diatur')} • Kelas ${escapeHtml(s.kelas)}</div>
+        </div>
+        <div class="vc-footer">
+          <div>
+            <div class="vc-label">Kewajiban Bulanan</div>
+            <div class="vc-amount">${fmtRupiah(nominal)}</div>
+          </div>
+          <div style="text-align:right;">
+            <div class="vc-label">Tahun Ajaran</div>
+            <div style="font-weight:600; font-size:14px;">${escapeHtml(store.state.settings.tahunAjaran)}</div>
+          </div>
         </div>
       </div>
-      <div class="stat-row">
-        <div class="stat-card rust">
-          <div class="stat-icon">${iconAlertTri()}</div>
-          <div class="label">Bulan Tertunggak</div>
-          <div class="value">${tunggakan.jumlahBulan} Bulan</div>
-          <div class="foot">Bulan belum dibayar (hingga bulan berjalan)</div>
+
+      <div class="card" style="margin-bottom:16px;">
+        <h3 style="margin-bottom:4px;">Progres Pembayaran</h3>
+        <div class="card-sub" style="margin-bottom:16px;">Target pelunasan 12 bulan (1 Tahun Ajaran)</div>
+        <div class="progress-container">
+          <div class="progress-track">
+            <div class="progress-fill" style="width: ${progressPercent}%"></div>
+          </div>
+          <div class="progress-text">
+            <span>${lunasCount} Bulan Lunas</span>
+            <span>${progressPercent}%</span>
+          </div>
         </div>
-        <div class="stat-card rust">
+      </div>
+      
+      <div class="stat-row">
+        <div class="stat-card ${tunggakan.jumlahBulan > 0 ? 'rust' : 'gold'}">
+          <div class="stat-icon">${iconAlertTri()}</div>
+          <div class="label">Status Tunggakan</div>
+          <div class="value">${tunggakan.jumlahBulan === 0 ? 'Lunas' : tunggakan.jumlahBulan + ' Bulan'}</div>
+          <div class="foot">Tunggakan hingga bulan berjalan</div>
+        </div>
+        <div class="stat-card ${tunggakan.totalKurang > 0 ? 'rust' : 'gold'}">
           <div class="stat-icon">${iconWallet()}</div>
           <div class="label">Kekurangan Pembayaran</div>
           <div class="value">${fmtRupiah(tunggakan.totalKurang)}</div>
-          <div class="foot">Total yang harus dilunasi</div>
+          <div class="foot">Total yang harus dilunasi saat ini</div>
         </div>
+      </div>
+      
+      <div style="margin-top:20px; display:flex; justify-content:center;">
+        <a href="https://wa.me/${escapeHtml(store.state.settings.noHpBendahara || '')}?text=Halo%20Bendahara%20${encodeURIComponent(store.state.settings.namaSekolah)},%20saya%20${encodeURIComponent(s.nama)}%20ingin%20bertanya%20seputar%20SPP." target="_blank" class="btn" style="background:#25D366; color:#fff; border:none; display:inline-flex; align-items:center; gap:8px;">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+          Hubungi Bendahara via WhatsApp
+        </a>
       </div>
     `;
     return;

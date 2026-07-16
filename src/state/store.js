@@ -62,10 +62,29 @@ export async function loadData(onLoaded){
     } else {
       store.state = defaultState();
     }
+    
+    // Load auth
+    try {
+      const auth = await storage.get('spp-auth-v1');
+      if (auth && auth.value) {
+        store.ui.currentUser = JSON.parse(auth.value);
+      }
+    } catch(e) {}
   }catch(e){
     store.state = defaultState();
   }
   if (onLoaded) onLoaded();
+}
+
+export async function saveAuth(user) {
+  try {
+    const storage = window.storage || { set: async (k, v) => localStorage.setItem(k, v) };
+    if (user) {
+      await storage.set('spp-auth-v1', JSON.stringify(user));
+    } else {
+      await storage.set('spp-auth-v1', ''); // or localStorage.removeItem if native
+    }
+  } catch(e) {}
 }
 
 let saveTimeout = null;

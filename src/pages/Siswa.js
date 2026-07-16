@@ -4,6 +4,8 @@ import { currentPeriodeEntry, siswaStatusBulan, escapeHtml, escapeAttr, uid, toa
 import { openModal, closeModal, openConfirm } from '../components/Modal.js';
 import * as XLSX from 'xlsx';
 
+let selectedSiswaIds = new Set();
+
 export function renderSiswa(){
   const el = document.getElementById('page-siswa');
   const kelasList = [...new Set(store.state.siswa.map(s=>s.kelas))].sort();
@@ -23,15 +25,24 @@ export function renderSiswa(){
           ${kelasList.map(k=>`<option value="${escapeAttr(k)}" ${store.ui.siswaKelasFilter===k?'selected':''}>${escapeHtml(k)}</option>`).join('')}
         </select>
       </div>
-      <div class="toolbar-right">
-        <button class="btn" id="btn-import"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21V9m0 0l-4 4m4-4l4 4M4 5h16"/></svg> Import Excel/CSV</button>
+      <div class="toolbar-right" style="gap:8px;">
+        <button class="btn btn-danger" id="btn-bulk-delete" style="display:none; padding:8px 12px;" title="Hapus Terpilih"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="margin:0;"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+        <button class="btn btn-secondary" id="btn-bulk-promote" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="13 17 18 12 13 7"></polyline><line x1="6" y1="12" x2="18" y2="12"></line></svg> Naik Kelas</button>
+        <div style="width:1px; background:var(--line); margin: 0 4px; display:none;" id="bulk-divider"></div>
+        <button class="btn" id="btn-download-template" title="Download Format Excel Kosong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
+        <button class="btn" id="btn-import"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> Import Excel</button>
         <button class="btn btn-primary" id="btn-add-siswa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg> Tambah Siswa</button>
       </div>
     </div>
     <div class="card" style="padding:0;">
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Nama</th><th>Kelas</th><th>NIS</th><th>No. WA</th><th class="num">SPP Bulan Ini</th><th style="width:90px;"></th></tr></thead>
+          <thead>
+            <tr>
+              <th style="width:40px; text-align:center;"><input type="checkbox" id="siswa-select-all"></th>
+              <th>Nama</th><th>Kelas</th><th>NIS</th><th>No. WA</th><th class="num">SPP Bulan Ini</th><th style="width:90px;"></th>
+            </tr>
+          </thead>
           <tbody id="siswa-tbody"></tbody>
         </table>
       </div>
@@ -47,11 +58,13 @@ export function renderSiswa(){
   const paged = filtered.slice((store.ui.pageSiswa-1)*ITEMS_PER_PAGE, store.ui.pageSiswa*ITEMS_PER_PAGE);
 
   if(paged.length===0){
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="5">Tidak ada siswa yang cocok.</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">Tidak ada siswa yang cocok.</td></tr>`;
   } else {
     tbody.innerHTML = paged.map(s=>{
       const st = siswaStatusBulan(s.id, cur.bulan, cur.tahun);
-      return `<tr>
+      const isChecked = selectedSiswaIds.has(s.id) ? 'checked' : '';
+      return `<tr class="${isChecked ? 'selected-row' : ''}">
+        <td style="text-align:center;"><input type="checkbox" class="siswa-select-cb" data-id="${s.id}" ${isChecked}></td>
         <td>${escapeHtml(s.nama)}</td>
         <td><span class="kelas-chip">${escapeHtml(s.kelas)}</span></td>
         <td>${escapeHtml(s.nis||'-')}</td>
@@ -85,6 +98,93 @@ export function renderSiswa(){
   document.getElementById('btn-import').addEventListener('click', ()=>document.getElementById('import-file-input').click());
   tbody.querySelectorAll('[data-edit-siswa]').forEach(b=>b.addEventListener('click', ()=>openSiswaModal(b.dataset.editSiswa)));
   tbody.querySelectorAll('[data-del-siswa]').forEach(b=>b.addEventListener('click', ()=>deleteSiswa(b.dataset.delSiswa)));
+
+  // Bulk Actions UI Update
+  const btnBulkDelete = document.getElementById('btn-bulk-delete');
+  const btnBulkPromote = document.getElementById('btn-bulk-promote');
+  const bulkDivider = document.getElementById('bulk-divider');
+  
+  const updateBulkUI = () => {
+    const hasSelection = selectedSiswaIds.size > 0;
+    btnBulkDelete.style.display = hasSelection ? 'inline-flex' : 'none';
+    btnBulkPromote.style.display = hasSelection ? 'inline-flex' : 'none';
+    bulkDivider.style.display = hasSelection ? 'block' : 'none';
+  };
+  
+  const selectAllCb = document.getElementById('siswa-select-all');
+  if(selectAllCb) {
+    selectAllCb.checked = paged.length > 0 && paged.every(s => selectedSiswaIds.has(s.id));
+    selectAllCb.addEventListener('change', (e) => {
+      const isChecked = e.target.checked;
+      paged.forEach(s => {
+        if(isChecked) selectedSiswaIds.add(s.id);
+        else selectedSiswaIds.delete(s.id);
+      });
+      renderSiswa(); 
+    });
+  }
+
+  tbody.querySelectorAll('.siswa-select-cb').forEach(cb => {
+    cb.addEventListener('change', (e) => {
+      const id = e.target.dataset.id;
+      if (e.target.checked) selectedSiswaIds.add(id);
+      else selectedSiswaIds.delete(id);
+      updateBulkUI();
+      const tr = e.target.closest('tr');
+      if (e.target.checked) tr.classList.add('selected-row');
+      else tr.classList.remove('selected-row');
+      selectAllCb.checked = paged.length > 0 && paged.every(s => selectedSiswaIds.has(s.id));
+    });
+  });
+  
+  updateBulkUI();
+
+  // Template Download
+  document.getElementById('btn-download-template').addEventListener('click', () => {
+    const ws = XLSX.utils.json_to_sheet([{ Nama: '', Kelas: '', NIS: '', WA: '', PIN: '' }]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "FormatSiswa");
+    XLSX.writeFile(wb, "Template_Siswa_SPP.xlsx");
+  });
+
+  btnBulkDelete.addEventListener('click', () => {
+    openConfirm(`Hapus ${selectedSiswaIds.size} siswa terpilih secara permanen? Data pembayaran mereka juga akan hilang.`, () => {
+      store.state.siswa = store.state.siswa.filter(s => !selectedSiswaIds.has(s.id));
+      store.state.pembayaran = store.state.pembayaran.filter(p => !selectedSiswaIds.has(p.siswaId));
+      selectedSiswaIds.clear();
+      saveData('Data siswa masal dihapus');
+      renderSiswa();
+    });
+  });
+
+  btnBulkPromote.addEventListener('click', () => {
+    openModal(`
+      <div class="modal-head"><h3>Naik Kelas Masal</h3><button class="close-x" id="modal-close">&times;</button></div>
+      <div class="modal-body">
+        <p style="margin-bottom:12px; font-size:14px; color:var(--ink-soft);">Anda akan memindahkan <b>${selectedSiswaIds.size}</b> siswa ke kelas baru.</p>
+        <div class="form-group">
+          <label>Kelas Tujuan</label>
+          <input id="bulk-kelas-baru" style="width:100%;" placeholder="cth. 8A">
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" id="modal-cancel">Batal</button>
+        <button class="btn btn-primary" id="modal-save-promote">Pindahkan Kelas</button>
+      </div>
+    `);
+    document.getElementById('modal-save-promote').addEventListener('click', () => {
+      const kelasBaru = document.getElementById('bulk-kelas-baru').value.trim();
+      if(!kelasBaru) { toast('Kelas tujuan wajib diisi', 'warning'); return; }
+      
+      store.state.siswa.forEach(s => {
+        if(selectedSiswaIds.has(s.id)) s.kelas = kelasBaru;
+      });
+      selectedSiswaIds.clear();
+      saveData('Siswa berhasil dinaikkan kelas');
+      closeModal();
+      renderSiswa();
+    });
+  });
 }
 
 function openSiswaModal(id){
