@@ -73,15 +73,14 @@ export function renderLogin() {
               <input type="text" id="login-siswa-nis" placeholder=" " required>
               <label for="login-siswa-nis">NIS (Nomor Induk Siswa)</label>
             </div>
-            <div class="form-group">
-              <label style="margin-bottom:8px;">PIN Siswa (4 Angka)</label>
-              <div class="pin-otp-container" id="pin-otp-container">
-                <input type="password" class="pin-box" maxlength="1" data-index="0" autocomplete="off" inputmode="numeric" required>
-                <input type="password" class="pin-box" maxlength="1" data-index="1" autocomplete="off" inputmode="numeric" required>
-                <input type="password" class="pin-box" maxlength="1" data-index="2" autocomplete="off" inputmode="numeric" required>
-                <input type="password" class="pin-box" maxlength="1" data-index="3" autocomplete="off" inputmode="numeric" required>
+            <div class="form-group form-floating">
+              <div class="password-wrapper">
+                <input type="password" id="login-siswa-pin" placeholder=" " required>
+                <label for="login-siswa-pin">PIN / Kata Sandi Siswa</label>
+                <button type="button" class="password-toggle" tabindex="-1" title="Tampilkan/Sembunyikan">
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                </button>
               </div>
-              <input type="hidden" id="login-siswa-pin">
             </div>
 
             <div class="login-options" style="display:flex; justify-content:space-between; align-items:center;">
@@ -214,11 +213,12 @@ export function renderLogin() {
           toast('NIS tidak boleh kosong', 'error');
           return;
         }
-        if(pin.length < 4) {
-          toast('PIN harus 4 digit', 'error');
-          if(pinContainer) {
-            pinContainer.classList.add('shake');
-            setTimeout(() => pinContainer.classList.remove('shake'), 400);
+        if(!pin) {
+          toast('PIN tidak boleh kosong', 'error');
+          const pinInput = document.getElementById('login-siswa-pin');
+          if(pinInput) {
+            pinInput.classList.add('shake');
+            setTimeout(() => pinInput.classList.remove('shake'), 400);
           }
           return;
         }
@@ -226,9 +226,10 @@ export function renderLogin() {
         const siswa = store.state.siswa.find(s => s.nis === nis);
         if(!siswa) {
           toast('NIS tidak terdaftar', 'error');
-          if(pinContainer) {
-            pinContainer.classList.add('shake');
-            setTimeout(() => pinContainer.classList.remove('shake'), 400);
+          const nisInput = document.getElementById('login-siswa-nis');
+          if(nisInput) {
+            nisInput.classList.add('shake');
+            setTimeout(() => nisInput.classList.remove('shake'), 400);
           }
           return;
         }
@@ -243,48 +244,17 @@ export function renderLogin() {
           toast('Login berhasil sebagai Siswa', 'success');
         } else {
           toast('PIN salah!', 'error');
-          if(pinContainer) {
-            pinContainer.classList.add('shake');
-            setTimeout(() => pinContainer.classList.remove('shake'), 400);
+          const pinInput = document.getElementById('login-siswa-pin');
+          if(pinInput) {
+            pinInput.classList.add('shake');
+            setTimeout(() => pinInput.classList.remove('shake'), 400);
           }
         }
       }
     }, 600); // 600ms loading simulation
   };
 
-  // OTP Logic
-  const pinBoxes = loginPage.querySelectorAll('.pin-box');
-  const hiddenPinInput = document.getElementById('login-siswa-pin');
-  
-  if (pinBoxes.length > 0) {
-    pinBoxes.forEach((box, index) => {
-      box.addEventListener('keydown', (e) => {
-        if (e.key === 'Backspace' && !box.value && index > 0) {
-          pinBoxes[index - 1].focus();
-        }
-      });
-      box.addEventListener('input', (e) => {
-        // Only allow numbers
-        box.value = box.value.replace(/[^0-9]/g, '');
-        
-        if (box.value && index < pinBoxes.length - 1) {
-          pinBoxes[index + 1].focus();
-        }
-        
-        // Update hidden input
-        const currentPin = Array.from(pinBoxes).map(b => b.value).join('');
-        hiddenPinInput.value = currentPin;
-        
-        // Auto submit if 4 digits entered and NIS is filled
-        if (currentPin.length === 4) {
-          const nisVal = document.getElementById('login-siswa-nis').value.trim();
-          if (nisVal) {
-             document.getElementById('btn-login-siswa').click();
-          }
-        }
-      });
-    });
-  }
+  // Removed OTP Logic as it's no longer used
 
   const formAdmin = document.getElementById('form-login-bendahara');
   formAdmin.addEventListener('submit', (e) => handleLoginSubmit(e, 'bendahara'));
