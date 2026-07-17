@@ -1,5 +1,12 @@
 import { toast } from '../utils/helpers.js';
-import { updateSaveTimestamp } from '../components/Navigation.js';
+import { updateSaveTimestamp, setSaveLoading } from '../components/Navigation.js';
+
+export async function hashPassword(text) {
+  const msgUint8 = new TextEncoder().encode(text);
+  const hashBuffer = await crypto.subtle.digest('SHA-256', msgUint8);
+  const hashArray = Array.from(new Uint8Array(hashBuffer));
+  return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+}
 
 export const store = {
   state: null,
@@ -64,6 +71,12 @@ export async function loadData(onLoaded){
       store.state = defaultState();
     }
     
+    // Auto-convert plain-text password to hash for security
+    if (store.state.settings.adminPassword && store.state.settings.adminPassword.length < 60) {
+      store.state.settings.adminPassword = await hashPassword(store.state.settings.adminPassword);
+      saveData();
+    }
+    
     // Load auth
     try {
       const auth = await storage.get('spp-auth-v1');
@@ -95,6 +108,7 @@ export function saveData(showToast){
     return;
   }
   clearTimeout(saveTimeout);
+  setSaveLoading();
   saveTimeout = setTimeout(async ()=>{
     try{
       const storage = window.storage || { set: async (k, v) => localStorage.setItem(k, v) };

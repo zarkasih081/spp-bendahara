@@ -1,4 +1,4 @@
-import { store, defaultState, saveData } from '../state/store.js';
+import { store, defaultState, saveData, hashPassword } from '../state/store.js';
 import { triggerRender } from '../utils/events.js';
 import { escapeAttr, BULAN, toast, downloadFile } from '../utils/helpers.js';
 import { openConfirm } from '../components/Modal.js';
@@ -16,8 +16,8 @@ export function renderPengaturan(){
         <div class="form-group"><label>Tahun Ajaran</label><input id="set-ta" style="width:100%;" value="${escapeAttr(s.tahunAjaran)}" placeholder="cth. 2025/2026"></div>
       </div>
       <div class="form-group" style="margin-top: 14px;">
-        <label>Kata Sandi (PIN) Bendahara</label>
-        <input id="set-admin-pass" type="text" style="width:100%;" value="${escapeAttr(s.adminPassword || 'admin')}">
+        <label>Kata Sandi (PIN) Bendahara Baru</label>
+        <input id="set-admin-pass" type="password" style="width:100%;" placeholder="Kosongkan jika tidak diubah">
         <div class="helper-text">Digunakan untuk login sebagai Bendahara.</div>
       </div>
     </div>
@@ -57,11 +57,15 @@ export function renderPengaturan(){
       <button class="btn btn-danger" id="btn-reset-data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Hapus Semua Data</button>
     </div>
   `;
-  document.getElementById('btn-save-settings').addEventListener('click', ()=>{
+  document.getElementById('btn-save-settings').addEventListener('click', async ()=>{
     s.namaSekolah = document.getElementById('set-nama').value.trim() || s.namaSekolah;
     s.bendahara = document.getElementById('set-bendahara').value.trim();
     s.tahunAjaran = document.getElementById('set-ta').value.trim() || s.tahunAjaran;
-    s.adminPassword = document.getElementById('set-admin-pass').value.trim() || s.adminPassword;
+    
+    const newPass = document.getElementById('set-admin-pass').value.trim();
+    if(newPass) {
+      s.adminPassword = await hashPassword(newPass);
+    }
     s.nominalSPP = parseInt(document.getElementById('set-nominal').value || '0',10) || s.nominalSPP;
     s.nominalIjazah = parseInt(document.getElementById('set-nominal-ijazah').value || '0',10) || s.nominalIjazah;
     s.bulanMulai = +document.getElementById('set-bulan-mulai').value;

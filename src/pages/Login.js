@@ -1,4 +1,4 @@
-import { store, saveAuth } from '../state/store.js';
+import { store, saveAuth, hashPassword } from '../state/store.js';
 import { triggerRender } from '../utils/events.js';
 import { escapeHtml, toast } from '../utils/helpers.js';
 import { LOGO_BASE64 } from '../utils/constants.js';
@@ -193,7 +193,7 @@ export function renderLogin() {
     btn.innerHTML = '<div class="spinner"></div>';
     btn.disabled = true;
 
-    setTimeout(() => {
+    setTimeout(async () => {
       btn.innerHTML = originalContent;
       btn.disabled = false;
       
@@ -201,7 +201,8 @@ export function renderLogin() {
         const user = document.getElementById('login-admin-user').value.trim();
         const pass = document.getElementById('login-admin-pass').value;
         const remember = document.getElementById('remember-admin').checked;
-        if(user === 'admin' && pass === store.state.settings.adminPassword) {
+        const hashedPass = await hashPassword(pass);
+        if(user === 'admin' && hashedPass === store.state.settings.adminPassword) {
           store.ui.currentUser = { role: 'bendahara' };
           if(remember) saveAuth(store.ui.currentUser);
           store.ui.page = 'dashboard';

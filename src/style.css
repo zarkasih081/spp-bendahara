@@ -740,11 +740,10 @@ body.dark-mode .badge.nunggak { color: #F87171; }
 
 @media (max-width: 640px) {
   .sidebar {
-    width: 0;
     transform: translateX(-100%);
+    transition: transform var(--transition-normal) cubic-bezier(0.4, 0, 0.2, 1);
   }
   .sidebar.mobile-open {
-    width: var(--sidebar-width);
     transform: translateX(0);
     box-shadow: var(--shadow-lg);
   }
@@ -780,12 +779,19 @@ body.dark-mode .badge.nunggak { color: #F87171; }
 
   /* Mobile overlay */
   .mobile-overlay {
-    display: none;
+    opacity: 0;
+    visibility: hidden;
     position: fixed; inset: 0;
-    background: rgba(43,38,32,.4);
+    background: rgba(15, 23, 42, 0.6);
+    backdrop-filter: blur(2px);
+    -webkit-backdrop-filter: blur(2px);
     z-index: 49;
+    transition: opacity 0.3s ease, visibility 0.3s ease;
   }
-  .mobile-overlay.active { display: block; }
+  .mobile-overlay.active { 
+    opacity: 1;
+    visibility: visible;
+  }
 }
 
 @media (min-width: 641px) {

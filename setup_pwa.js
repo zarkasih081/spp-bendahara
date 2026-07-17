@@ -21,8 +21,8 @@ const manifest = {
   "short_name": "SPPKu",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#ffffff",
-  "theme_color": "#0d9488",
+  "background_color": "#f3f4f6",
+  "theme_color": "#333594",
   "icons": [
     {
       "src": "/icon-192.png",

@@ -162,3 +162,10 @@ export function updateSaveTimestamp() {
     foot.innerHTML = `<span class="dot"></span><span class="foot-text">Tersimpan ${time}</span>`;
   }
 }
+
+export function setSaveLoading() {
+  const foot = document.getElementById('sidebar-foot');
+  if(foot) {
+    foot.innerHTML = `<span class="spinner" style="width:12px;height:12px;border-width:2px;margin-right:8px;margin-left:2px;display:inline-block"></span><span class="foot-text">Menyimpan...</span>`;
+  }
+}
