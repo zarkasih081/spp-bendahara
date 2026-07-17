@@ -19,19 +19,19 @@ fs.writeFileSync(iconPath512, base64Data, 'base64');
 const manifest = {
   "name": "SPPKu",
   "short_name": "SPPKu",
-  "start_url": "/",
+  "start_url": "./",
   "display": "standalone",
   "background_color": "#f3f4f6",
   "theme_color": "#333594",
   "icons": [
     {
-      "src": "/icon-192.png",
+      "src": "./icon-192.png",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any maskable"
     },
     {
-      "src": "/icon-512.png",
+      "src": "./icon-512.png",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any maskable"
@@ -45,9 +45,9 @@ fs.writeFileSync(path.join(publicDir, 'manifest.json'), JSON.stringify(manifest,
 const swContent = `
 const CACHE_NAME = 'buku-spp-v1';
 const urlsToCache = [
-  '/',
-  '/index.html',
-  '/manifest.json'
+  './',
+  './index.html',
+  './manifest.json'
 ];
 
 self.addEventListener('install', event => {
