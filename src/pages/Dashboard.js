@@ -38,6 +38,10 @@ export function renderDashboard(){
     
     const lunasCount = periode.filter(p => siswaTotalBulan(s.id, p.bulan, p.tahun) >= nominal).length;
     const progressPercent = Math.round((lunasCount / 12) * 100);
+    
+    const nominalIjazah = store.state.settings.nominalIjazah || 500000;
+    const ijazahTerbayar = store.state.pembayaran.filter(p => p.siswaId === s.id && p.jenis === 'ijazah').reduce((sum, p) => sum + p.nominal, 0);
+    const ijazahPercent = Math.min(100, Math.round((ijazahTerbayar / nominalIjazah) * 100));
 
     el.innerHTML = `
       <div class="virtual-card">
@@ -62,7 +66,7 @@ export function renderDashboard(){
       </div>
 
       <div class="card" style="margin-bottom:16px;">
-        <h3 style="margin-bottom:4px;">Progres Pembayaran</h3>
+        <h3 style="margin-bottom:4px;">Progres Pembayaran SPP</h3>
         <div class="card-sub" style="margin-bottom:16px;">Target pelunasan 12 bulan (1 Tahun Ajaran)</div>
         <div class="progress-container">
           <div class="progress-track">
@@ -71,6 +75,20 @@ export function renderDashboard(){
           <div class="progress-text">
             <span>${lunasCount} Bulan Lunas</span>
             <span>${progressPercent}%</span>
+          </div>
+        </div>
+      </div>
+      
+      <div class="card" style="margin-bottom:16px;">
+        <h3 style="margin-bottom:4px;">Progres Pembayaran Ijazah</h3>
+        <div class="card-sub" style="margin-bottom:16px;">Total Tagihan: ${fmtRupiah(nominalIjazah)}</div>
+        <div class="progress-container">
+          <div class="progress-track">
+            <div class="progress-fill" style="width: ${ijazahPercent}%; background: #10B981;"></div>
+          </div>
+          <div class="progress-text">
+            <span>${fmtRupiah(ijazahTerbayar)} Terbayar</span>
+            <span>${ijazahPercent}%</span>
           </div>
         </div>
       </div>
@@ -104,8 +122,12 @@ export function renderDashboard(){
   const cur = currentPeriodeEntry();
   const totalSiswa = store.state.siswa.length;
   
-  const totalMasukBulanIni = store.state.pembayaran
-    .filter(p=>p.bulan===cur.bulan && p.tahun===cur.tahun)
+  const totalSPPMasukBulanIni = store.state.pembayaran
+    .filter(p=>(!p.jenis || p.jenis==='spp') && p.bulan===cur.bulan && p.tahun===cur.tahun)
+    .reduce((a,p)=>a+p.nominal,0);
+    
+  const totalIjazahMasuk = store.state.pembayaran
+    .filter(p=>p.jenis==='ijazah')
     .reduce((a,p)=>a+p.nominal,0);
 
   let lunasCount = 0, parsialCount = 0, nunggakCount = 0;
@@ -138,15 +160,15 @@ export function renderDashboard(){
     <div class="stat-row">
       <div class="stat-card gold">
         <div class="stat-icon">${iconMoney()}</div>
-        <div class="label">Masuk Bulan ${BULAN[cur.bulan-1]}</div>
-        <div class="value">${fmtRupiah(totalMasukBulanIni)}</div>
-        <div class="foot">dari ${store.state.pembayaran.filter(p=>p.bulan===cur.bulan&&p.tahun===cur.tahun).length} transaksi</div>
+        <div class="label">SPP Masuk Bulan ${BULAN[cur.bulan-1]}</div>
+        <div class="value">${fmtRupiah(totalSPPMasukBulanIni)}</div>
+        <div class="foot">Bulan berjalan</div>
       </div>
-      <div class="stat-card">
-        <div class="stat-icon">${iconUserCheck()}</div>
-        <div class="label">Siswa Lunas Bulan Ini</div>
-        <div class="value">${lunasCount} <span style="font-size:13px;color:var(--ink-soft);font-weight:400;">/ ${totalSiswa}</span></div>
-        <div class="foot">${totalSiswa? Math.round(lunasCount/totalSiswa*100):0}% dari total siswa</div>
+      <div class="stat-card" style="background:#ecfdf5; border-color:#d1fae5; color:#065f46;">
+        <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        <div class="label">Total Ijazah Masuk</div>
+        <div class="value">${fmtRupiah(totalIjazahMasuk)}</div>
+        <div class="foot">Akumulasi seluruhnya</div>
       </div>
       <div class="stat-card rust">
         <div class="stat-icon">${iconAlertTri()}</div>
@@ -158,7 +180,7 @@ export function renderDashboard(){
         <div class="stat-icon">${iconWallet()}</div>
         <div class="label">Total Piutang Berjalan</div>
         <div class="value">${fmtRupiah(totalPiutang)}</div>
-        <div class="foot">akumulasi tunggakan tahun ajaran ini</div>
+        <div class="foot">akumulasi tunggakan SPP</div>
       </div>
     </div>
 

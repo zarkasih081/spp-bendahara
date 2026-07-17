@@ -17,7 +17,9 @@ export function renderLaporan(){
     rows = rows.filter(p=>idsInKelas.has(p.siswaId));
   }
   rows = rows.sort((a,b)=> new Date(b.tanggal)-new Date(a.tanggal));
-  const total = rows.reduce((a,p)=>a+p.nominal,0);
+  const totalSPP = rows.filter(p=>!p.jenis || p.jenis==='spp').reduce((a,p)=>a+p.nominal,0);
+  const totalIjazah = rows.filter(p=>p.jenis==='ijazah').reduce((a,p)=>a+p.nominal,0);
+  const total = totalSPP + totalIjazah;
 
   el.innerHTML = `
     <div class="toolbar">
@@ -31,8 +33,13 @@ export function renderLaporan(){
       </div>
     </div>
 
-    <div class="kpi-line">
+    <div class="kpi-line" style="margin-bottom: 16px;">
       <div class="kpi"><span class="n">${fmtRupiah(total)}</span><span class="l">Total Diterima</span></div>
+      <div class="kpi"><span class="n">${fmtRupiah(totalSPP)}</span><span class="l">Total SPP</span></div>
+      <div class="kpi"><span class="n">${fmtRupiah(totalIjazah)}</span><span class="l">Total Ijazah</span></div>
+    </div>
+    
+    <div class="kpi-line">
       <div class="kpi"><span class="n">${rows.length}</span><span class="l">Jumlah Transaksi</span></div>
       <div class="kpi"><span class="n">${new Set(rows.map(r=>r.siswaId)).size}</span><span class="l">Siswa Membayar</span></div>
     </div>
@@ -40,7 +47,7 @@ export function renderLaporan(){
     <div class="card" style="padding:0;">
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Tanggal</th><th>Nama Siswa</th><th>Kelas</th><th>No. Kwitansi</th><th class="num">Nominal</th><th style="width:40px;"></th></tr></thead>
+          <thead><tr><th>Tanggal</th><th>Nama Siswa</th><th>Kelas</th><th>No. Kwitansi</th><th>Jenis</th><th class="num">Nominal</th><th style="width:40px;"></th></tr></thead>
           <tbody id="laporan-tbody"></tbody>
         </table>
       </div>
@@ -57,6 +64,7 @@ export function renderLaporan(){
         <td>${escapeHtml(s.nama)}</td>
         <td><span class="kelas-chip">${escapeHtml(s.kelas)}</span></td>
         <td>${p.noKwitansi||'-'}</td>
+        <td>${p.jenis==='ijazah' ? 'Ijazah' : 'SPP'}</td>
         <td class="num">${fmtRupiah(p.nominal)}</td>
         <td style="text-align:right;">
           <button class="btn btn-sm btn-ghost" data-del-lap="${p.id}" title="Hapus transaksi" style="color:var(--rust);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
@@ -79,13 +87,16 @@ export function renderLaporan(){
 
 function exportLaporanCsv(rows){
   if(rows.length===0){ toast('Tidak ada data untuk diexport', 'warning'); return; }
-  const header = ['Tanggal','Nama Siswa','Kelas','NIS','No Kwitansi','Bulan','Tahun','Nominal'];
+  const header = ['Tanggal','Nama Siswa','Kelas','NIS','No Kwitansi','Jenis','Bulan','Tahun','Nominal'];
   const lines = [header.join(',')];
   rows.forEach(p=>{
     const s = store.state.siswa.find(x=>x.id===p.siswaId) || {nama:'',kelas:'',nis:''};
-    lines.push([fmtDate(p.tanggal), csvSafe(s.nama), csvSafe(s.kelas), csvSafe(s.nis||''), p.noKwitansi||'', BULAN[p.bulan-1], p.tahun, p.nominal].join(','));
+    const jenis = p.jenis === 'ijazah' ? 'Ijazah' : 'SPP';
+    const bln = p.jenis === 'ijazah' ? '-' : BULAN[p.bulan-1];
+    const thn = p.jenis === 'ijazah' ? '-' : p.tahun;
+    lines.push([fmtDate(p.tanggal), csvSafe(s.nama), csvSafe(s.kelas), csvSafe(s.nis||''), p.noKwitansi||'', jenis, bln, thn, p.nominal].join(','));
   });
-  downloadFile(`laporan-spp-${BULAN[store.ui.laporanBulan-1]}-${store.ui.laporanTahun}.csv`, lines.join('\n'));
+  downloadFile(`laporan-pembayaran-${BULAN[store.ui.laporanBulan-1]}-${store.ui.laporanTahun}.csv`, lines.join('\n'));
 }
 
 function csvSafe(v){ v=String(v||''); return '"' + v.replace(/"/g, '""') + '"'; }

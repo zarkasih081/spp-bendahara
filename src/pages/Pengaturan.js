@@ -22,9 +22,12 @@ export function renderPengaturan(){
       </div>
     </div>
     <div class="card" style="max-width:560px;">
-      <h3>Nominal & Periode SPP</h3>
-      <div class="card-sub">Nominal SPP berlaku sama untuk semua siswa</div>
-      <div class="form-group"><label>Nominal SPP per Bulan (Rp)</label><input id="set-nominal" type="number" style="width:100%;" value="${s.nominalSPP}"></div>
+      <h3>Nominal & Periode</h3>
+      <div class="card-sub">Nominal SPP dan Ijazah berlaku sama untuk semua siswa</div>
+      <div class="form-row">
+        <div class="form-group"><label>Nominal SPP per Bulan (Rp)</label><input id="set-nominal" type="number" style="width:100%;" value="${s.nominalSPP}"></div>
+        <div class="form-group"><label>Nominal Ijazah (Rp)</label><input id="set-nominal-ijazah" type="number" style="width:100%;" value="${s.nominalIjazah || 500000}"></div>
+      </div>
       <div class="form-row">
         <div class="form-group">
           <label>Bulan Awal Tahun Ajaran</label>
@@ -60,6 +63,7 @@ export function renderPengaturan(){
     s.tahunAjaran = document.getElementById('set-ta').value.trim() || s.tahunAjaran;
     s.adminPassword = document.getElementById('set-admin-pass').value.trim() || s.adminPassword;
     s.nominalSPP = parseInt(document.getElementById('set-nominal').value || '0',10) || s.nominalSPP;
+    s.nominalIjazah = parseInt(document.getElementById('set-nominal-ijazah').value || '0',10) || s.nominalIjazah;
     s.bulanMulai = +document.getElementById('set-bulan-mulai').value;
     s.tahunMulai = parseInt(document.getElementById('set-tahun-mulai').value,10) || s.tahunMulai;
     saveData('Pengaturan disimpan');

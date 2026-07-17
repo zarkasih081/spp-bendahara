@@ -21,10 +21,20 @@ export function renderBayar(){
   const selectedId = store.ui.bayarSiswaId || sorted[0].id;
   store.ui.bayarSiswaId = selectedId;
   const siswa = store.state.siswa.find(s=>s.id===selectedId);
+  
+  store.ui.bayarJenis = store.ui.bayarJenis || 'spp';
+  const jenis = store.ui.bayarJenis;
   const periode = getPeriodeBerjalan();
-  const nominal = store.state.settings.nominalSPP;
+  const nominalSPP = store.state.settings.nominalSPP;
+  const nominalIjazah = store.state.settings.nominalIjazah || 500000;
+  
+  const ijazahTerbayar = store.state.pembayaran.filter(p=>p.siswaId===siswa.id && p.jenis==='ijazah').reduce((sum, p)=>sum+p.nominal, 0);
 
   el.innerHTML = `
+    <div class="tabs" style="margin-bottom: 16px;">
+      <button class="tab-btn ${jenis==='spp'?'active':''}" id="tab-spp">Pembayaran SPP</button>
+      <button class="tab-btn ${jenis==='ijazah'?'active':''}" id="tab-ijazah">Pembayaran Ijazah</button>
+    </div>
     <div class="card">
       <div class="form-row">
         <div class="form-group">
@@ -34,20 +44,31 @@ export function renderBayar(){
           </select>
         </div>
         <div class="form-group">
-          <label>Nominal SPP per Bulan</label>
-          <input value="${fmtRupiah(nominal)}" disabled style="width:100%;">
+          <label>${jenis==='spp' ? 'Nominal SPP per Bulan' : 'Tagihan Ijazah (Total)'}</label>
+          <input value="${jenis==='spp' ? fmtRupiah(nominalSPP) : fmtRupiah(nominalIjazah)}" disabled style="width:100%;">
         </div>
       </div>
       <div class="divider"></div>
-      <label>Pilih bulan yang dibayar (klik untuk pilih, hijau = sudah lunas)</label>
-      <div class="month-grid" id="month-grid"></div>
-      <div class="helper-text">Bisa pilih lebih dari satu bulan sekaligus. Klasifikasi tunggakan mengikuti Tahun Ajaran ${store.state.settings.tahunAjaran}.</div>
+      
+      ${jenis==='spp' ? `
+        <label>Pilih bulan yang dibayar (klik untuk pilih, hijau = sudah lunas)</label>
+        <div class="month-grid" id="month-grid"></div>
+        <div class="helper-text">Bisa pilih lebih dari satu bulan sekaligus. Klasifikasi tunggakan mengikuti Tahun Ajaran ${store.state.settings.tahunAjaran}.</div>
+      ` : `
+        <div style="background:var(--paper-dim); padding:12px; border-radius:6px; margin-bottom:14px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>Total Tagihan Ijazah:</span> <strong>${fmtRupiah(nominalIjazah)}</strong></div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#10B981;"><span>Sudah Terbayar:</span> <strong>${fmtRupiah(ijazahTerbayar)}</strong></div>
+          <div class="divider" style="margin:8px 0;"></div>
+          <div style="display:flex; justify-content:space-between; color:var(--rust); font-weight:600;"><span>Sisa Tagihan:</span> <span>${fmtRupiah(Math.max(0, nominalIjazah - ijazahTerbayar))}</span></div>
+        </div>
+      `}
+
       <div class="divider"></div>
       <div class="form-row">
         <div class="form-group">
           <label>Total Nominal Dibayar</label>
           <input id="bayar-nominal" type="text" style="width:100%;" placeholder="0">
-          <div class="helper-text" id="nominal-hint"></div>
+          <div class="helper-text" id="nominal-hint">${jenis==='ijazah' ? 'Masukkan nominal cicilan/pelunasan Ijazah' : ''}</div>
         </div>
         <div class="form-group">
           <label>Tanggal Bayar</label>
@@ -65,14 +86,17 @@ export function renderBayar(){
       <h3>Riwayat Pembayaran — ${escapeHtml(siswa.nama)}</h3>
       <div class="card-sub">Transaksi terbaru untuk siswa ini</div>
       <div class="table-scroll">
-        <table><thead><tr><th>Tanggal</th><th>Bulan</th><th class="num">Nominal</th><th>Ket.</th><th style="width:70px;"></th></tr></thead>
+        <table><thead><tr><th>Tanggal</th><th>Jenis / Bulan</th><th class="num">Nominal</th><th>Ket.</th><th style="width:70px;"></th></tr></thead>
         <tbody id="bayar-riwayat-tbody"></tbody></table>
       </div>
     </div>
   `;
 
-  renderMonthGrid(siswa, periode, nominal);
+  if(jenis==='spp') renderMonthGrid(siswa, periode, nominalSPP);
   renderBayarRiwayat(siswa);
+
+  document.getElementById('tab-spp').addEventListener('click', ()=>{ store.ui.bayarJenis='spp'; store.ui.bayarSelectedMonths=[]; renderBayar(); });
+  document.getElementById('tab-ijazah').addEventListener('click', ()=>{ store.ui.bayarJenis='ijazah'; store.ui.bayarSelectedMonths=[]; renderBayar(); });
 
   document.getElementById('bayar-siswa-select').addEventListener('change', e=>{
     store.ui.bayarSiswaId = e.target.value; store.ui.bayarSelectedMonths = []; renderBayar();
@@ -82,10 +106,10 @@ export function renderBayar(){
     if(val) val = parseInt(val, 10).toLocaleString('id-ID');
     e.target.value = val;
     e.target.dataset.touched = '1';
-    updateNominalHint(nominal);
+    if(jenis==='spp') updateNominalHint(nominalSPP);
   });
   document.getElementById('bayar-nominal').addEventListener('focus', e=> e.target.select());
-  document.getElementById('btn-simpan-bayar').addEventListener('click', ()=>simpanPembayaran(nominal));
+  document.getElementById('btn-simpan-bayar').addEventListener('click', ()=>simpanPembayaran(nominalSPP));
 }
 
 function renderMonthGrid(siswa, periode, nominal){
@@ -129,7 +153,7 @@ function renderBayarRiwayat(siswa){
   if(rows.length===0){ tbody.innerHTML = `<tr class="empty-row"><td colspan="5">Belum ada riwayat pembayaran.</td></tr>`; return; }
   tbody.innerHTML = rows.map(p=>`<tr>
     <td>${fmtDate(p.tanggal)}</td>
-    <td>${BULAN[p.bulan-1]} ${p.tahun}</td>
+    <td>${(!p.jenis || p.jenis==='spp') ? 'SPP ' + BULAN[p.bulan-1] + ' ' + p.tahun : 'Ijazah'}</td>
     <td class="num">${fmtRupiah(p.nominal)}</td>
     <td>${escapeHtml(p.keterangan||'-')}</td>
     <td>
@@ -139,7 +163,8 @@ function renderBayarRiwayat(siswa){
   </tr>`).join('');
   tbody.querySelectorAll('[data-cetak]').forEach(b=>b.addEventListener('click', ()=>{
     const p = store.state.pembayaran.find(x=>x.id===b.dataset.cetak);
-    cetakKwitansi(siswa, [{bulan:p.bulan, tahun:p.tahun}], p.nominal, p.noKwitansi, p.tanggal);
+    const jenis = p.jenis || 'spp';
+    cetakKwitansi(siswa, [{bulan:p.bulan, tahun:p.tahun}], p.nominal, p.noKwitansi, p.tanggal, jenis);
   }));
   tbody.querySelectorAll('[data-del-bayar]').forEach(b=>b.addEventListener('click', ()=>{
     openConfirm('Batalkan transaksi pembayaran ini?', ()=>{
@@ -159,11 +184,12 @@ function simpanPembayaran(nominalSPP){
   const tanggal = inTanggal.value;
   const ket = document.getElementById('bayar-ket').value.trim();
   const months = store.ui.bayarSelectedMonths;
+  const jenis = store.ui.bayarJenis;
   
   inNominal.classList.remove('error');
   inTanggal.classList.remove('error');
 
-  if(months.length===0){ toast('Pilih minimal satu bulan', 'warning'); return; }
+  if(jenis==='spp' && months.length===0){ toast('Pilih minimal satu bulan', 'warning'); return; }
   if(!nominal || nominal<=0){ 
     inNominal.classList.add('error');
     toast('Isi nominal pembayaran', 'warning'); 
@@ -178,24 +204,32 @@ function simpanPembayaran(nominalSPP){
   store.state.settings.kwitansiCounter = (store.state.settings.kwitansiCounter||0) + 1;
   const noKwitansi = 'KW-' + new Date(tanggal).getFullYear() + '-' + String(store.state.settings.kwitansiCounter).padStart(4,'0');
 
-  const per = Math.floor(nominal / months.length);
-  const remainder = nominal - per*months.length;
-  months.forEach((m,i)=>{
-    store.state.pembayaran.push({
-      id: uid(), siswaId: siswa.id, bulan: m.bulan, tahun: m.tahun,
-      tanggal, nominal: per + (i===0?remainder:0), keterangan: ket, noKwitansi
+  if(jenis === 'spp'){
+    const per = Math.floor(nominal / months.length);
+    const remainder = nominal - per*months.length;
+    months.forEach((m,i)=>{
+      store.state.pembayaran.push({
+        id: uid(), siswaId: siswa.id, jenis: 'spp', bulan: m.bulan, tahun: m.tahun,
+        tanggal, nominal: per + (i===0?remainder:0), keterangan: ket, noKwitansi
+      });
     });
-  });
+  } else {
+    store.state.pembayaran.push({
+      id: uid(), siswaId: siswa.id, jenis: 'ijazah', bulan: null, tahun: null,
+      tanggal, nominal, keterangan: ket, noKwitansi
+    });
+  }
 
   saveData('Pembayaran tersimpan');
   store.ui.bayarSelectedMonths = [];
-  cetakKwitansi(siswa, months, nominal, noKwitansi, tanggal);
+  cetakKwitansi(siswa, months, nominal, noKwitansi, tanggal, jenis);
   renderBayar();
 }
 
-function cetakKwitansi(siswa, months, nominal, noKwitansi, tanggal){
+function cetakKwitansi(siswa, months, nominal, noKwitansi, tanggal, jenis){
   const s = store.state.settings;
-  const bulanText = months.map(m=>`${BULAN[m.bulan-1]} ${m.tahun}`).join(', ');
+  const itemText = jenis==='spp' ? 'SPP Bulan ' + months.map(m=>`${BULAN[m.bulan-1]} ${m.tahun}`).join(', ') : 'Pembayaran Ijazah';
+  
   const area = document.getElementById('kwitansi-print-area');
   area.innerHTML = `
     <div class="receipt">
@@ -204,13 +238,13 @@ function cetakKwitansi(siswa, months, nominal, noKwitansi, tanggal){
         <div class="sekolah">${escapeHtml(s.namaSekolah)}</div>
         <div class="ta">Tahun Ajaran ${escapeHtml(s.tahunAjaran)}</div>
       </div>
-      <div class="receipt-title">KUITANSI PEMBAYARAN SPP</div>
+      <div class="receipt-title">${jenis==='spp' ? 'KUITANSI PEMBAYARAN SPP' : 'KUITANSI PEMBAYARAN IJAZAH'}</div>
       <div class="receipt-row"><span class="k">No. Kuitansi</span><span class="v">${noKwitansi}</span></div>
       <div class="receipt-row"><span class="k">Tanggal</span><span class="v">${fmtDate(tanggal)}</span></div>
       <div class="receipt-row"><span class="k">Nama Siswa</span><span class="v">${escapeHtml(siswa.nama)}</span></div>
       <div class="receipt-row"><span class="k">Kelas</span><span class="v">${escapeHtml(siswa.kelas)}</span></div>
       <div class="receipt-row"><span class="k">NIS</span><span class="v">${escapeHtml(siswa.nis||'-')}</span></div>
-      <div class="receipt-row"><span class="k">Pembayaran</span><span class="v">SPP Bulan ${bulanText}</span></div>
+      <div class="receipt-row"><span class="k">Pembayaran</span><span class="v">${itemText}</span></div>
       <div class="receipt-amt">
         <div class="lbl">Jumlah Dibayar</div>
         <div class="amt">${fmtRupiah(nominal)}</div>
@@ -222,10 +256,10 @@ function cetakKwitansi(siswa, months, nominal, noKwitansi, tanggal){
       <div class="receipt-foot">Kuitansi digital ini merupakan bukti pembayaran yang sah untuk keperluan arsip.</div>
     </div>
   `;
-  openKwitansiModal(noKwitansi, siswa, bulanText, nominal, tanggal);
+  openKwitansiModal(noKwitansi, siswa, itemText, nominal, tanggal, jenis);
 }
 
-function openKwitansiModal(noKwitansi, siswa, bulanText, nominal, tanggal){
+function openKwitansiModal(noKwitansi, siswa, itemText, nominal, tanggal, jenis){
   const hasWa = !!siswa.noHp;
   openModal(`
     <div class="modal-head"><h3>Kuitansi ${noKwitansi}</h3><button class="close-x" id="modal-close">&times;</button></div>
@@ -243,14 +277,14 @@ function openKwitansiModal(noKwitansi, siswa, bulanText, nominal, tanggal){
   
   if(hasWa){
     document.getElementById('btn-wa-kwitansi').addEventListener('click', ()=>{
-      const teks = `*KUITANSI PEMBAYARAN SPP*
+      const teks = `*KUITANSI PEMBAYARAN ${jenis==='spp'?'SPP':'IJAZAH'}*
 *${store.state.settings.namaSekolah.toUpperCase()}*
 ------------------------------------------------------
 
 Kepada Yth. Bapak/Ibu Wali Murid dari *${siswa.nama}*,
 
 Dengan hormat,
-Melalui pesan ini kami menginformasikan bahwa kami telah menerima pembayaran SPP dengan rincian sebagai berikut:
+Melalui pesan ini kami menginformasikan bahwa kami telah menerima pembayaran ${jenis==='spp'?'SPP':'Ijazah'} dengan rincian sebagai berikut:
 
 📋 *Data Siswa*
 Nama  : ${siswa.nama}
@@ -260,7 +294,7 @@ NIS   : ${siswa.nis || '-'}
 📝 *Rincian Pembayaran*
 No. Kuitansi : ${noKwitansi}
 Tanggal      : ${fmtDate(tanggal)}
-Pembayaran   : SPP Bulan ${bulanText}
+Pembayaran   : ${itemText}
 Total Bayar  : *${fmtRupiah(nominal)}*
 
 ------------------------------------------------------

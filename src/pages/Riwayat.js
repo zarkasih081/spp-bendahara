@@ -35,6 +35,14 @@ export function renderRiwayat(){
       </div>
       
       <div class="card" style="margin-top:16px;">
+        <h3>Status Pembayaran Ijazah</h3>
+        <div style="display:flex; justify-content:space-between; margin-top:8px;">
+          <span>Total Tagihan: <strong>${fmtRupiah(store.state.settings.nominalIjazah || 500000)}</strong></span>
+          <span style="color:var(--rust); font-weight:600;">Sisa: ${fmtRupiah(Math.max(0, (store.state.settings.nominalIjazah || 500000) - payments.filter(p=>p.jenis==='ijazah').reduce((sum, p)=>sum+p.nominal, 0)))}</span>
+        </div>
+      </div>
+      
+      <div class="card" style="margin-top:16px;">
         <h3>Riwayat Transaksi</h3>
         ${payments.length === 0 ? '<div class="empty-state">Belum ada transaksi pembayaran.</div>' : `
           <div class="transaction-list" style="margin-top:16px;">
@@ -45,7 +53,7 @@ export function renderRiwayat(){
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
                   </div>
                   <div>
-                    <div class="ti-title">SPP Bulan ${BULAN[p.bulan-1]} ${p.tahun}</div>
+                    <div class="ti-title">${(!p.jenis || p.jenis==='spp') ? 'SPP Bulan ' + BULAN[p.bulan-1] + ' ' + p.tahun : 'Pembayaran Ijazah'}</div>
                     <div class="ti-date">${new Date(p.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</div>
                   </div>
                 </div>
@@ -102,7 +110,7 @@ export function renderRiwayat(){
     <div class="card" style="padding:0;">
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Nama</th><th>Kelas</th><th>Status Bulan Ini</th><th class="num">Bulan Tertunggak</th><th class="num">Total Kekurangan</th><th style="width:50px;"></th></tr></thead>
+          <thead><tr><th>Nama</th><th>Kelas</th><th>Status Bulan Ini</th><th class="num">Sisa Ijazah</th><th class="num">Bulan Tertunggak</th><th class="num">Tunggakan SPP</th><th style="width:50px;"></th></tr></thead>
           <tbody id="riwayat-tbody"></tbody>
         </table>
       </div>
@@ -123,6 +131,7 @@ export function renderRiwayat(){
       <td>${escapeHtml(r.s.nama)}</td>
       <td><span class="kelas-chip">${escapeHtml(r.s.kelas)}</span></td>
       <td><span class="badge ${r.st}">${r.st==='lunas'?'Lunas':r.st==='parsial'?'Sebagian':'Belum Bayar'}</span></td>
+      <td class="num">${fmtRupiah(Math.max(0, (store.state.settings.nominalIjazah || 500000) - store.state.pembayaran.filter(p=>p.siswaId===r.s.id && p.jenis==='ijazah').reduce((sum, p)=>sum+p.nominal, 0)))}</td>
       <td class="num">${r.t.jumlahBulan}</td>
       <td class="num">${fmtRupiah(r.t.totalKurang)}</td>
       <td style="display:flex; gap:4px; justify-content:flex-end;">
@@ -171,10 +180,14 @@ function openDetailSiswa(id){
       <div class="kpi-line">
         <div class="kpi"><span class="n">${escapeHtml(s.kelas)}</span><span class="l">Kelas</span></div>
         <div class="kpi"><span class="n">${escapeHtml(s.nis||'-')}</span><span class="l">NIS</span></div>
-        <div class="kpi"><span class="n">${fmtRupiah(t.totalKurang)}</span><span class="l">Total Kekurangan</span></div>
+        <div class="kpi"><span class="n">${fmtRupiah(t.totalKurang)}</span><span class="l">Tunggakan SPP</span></div>
       </div>
       <div class="divider"></div>
-      <label>Status per bulan — Tahun Ajaran ${store.state.settings.tahunAjaran}</label>
+      <div style="display:flex; justify-content:space-between; margin-bottom:12px; background:var(--paper-dim); padding:10px; border-radius:6px;">
+        <span>Sisa Tagihan Ijazah:</span>
+        <strong style="color:var(--rust);">${fmtRupiah(Math.max(0, (store.state.settings.nominalIjazah || 500000) - store.state.pembayaran.filter(p=>p.siswaId===s.id && p.jenis==='ijazah').reduce((sum, p)=>sum+p.nominal, 0)))}</strong>
+      </div>
+      <label>Status SPP per bulan — Tahun Ajaran ${store.state.settings.tahunAjaran}</label>
       <div class="month-grid">
         ${periode.map(p=>{
           const total = siswaTotalBulan(s.id, p.bulan, p.tahun);

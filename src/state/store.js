@@ -33,6 +33,7 @@ export function defaultState(){
       tahunAjaran: `${now.getFullYear()}/${now.getFullYear()+1}`,
       bendahara: '',
       nominalSPP: 150000,
+      nominalIjazah: 500000,
       bulanMulai: 7,
       tahunMulai: now.getMonth()+1 >= 7 ? now.getFullYear() : now.getFullYear()-1,
       kwitansiCounter: 0,

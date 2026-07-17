@@ -17,8 +17,8 @@ fs.writeFileSync(iconPath512, base64Data, 'base64');
 
 // 2. Create manifest.json
 const manifest = {
-  "name": "Buku SPP",
-  "short_name": "Buku SPP",
+  "name": "SPPKu",
+  "short_name": "SPPKu",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#ffffff",

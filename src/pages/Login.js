@@ -23,8 +23,8 @@ export function renderLogin() {
     <div class="login-container">
       <div class="login-left">
         <div class="login-left-pattern"></div>
-        <h1>Buku SPP<br>Aplikasi Bendahara</h1>
-        <p>Kelola pencatatan, pelaporan, dan riwayat pembayaran SPP sekolah Anda secara modern, cepat, dan transparan.</p>
+        <h1>SPPKu</h1>
+        <p>Aplikasi pencatatan pembayaran SPP dan Ijazah sekolah yang modern, cepat, dan transparan.</p>
         <div class="login-quote-box">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="quote-icon"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"></path><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"></path></svg>
           <p id="login-quote" class="quote-text"></p>
@@ -38,11 +38,11 @@ export function renderLogin() {
       </div>
       <div class="login-right">
         <div class="login-card">
-          <div class="login-logo" id="secret-trigger" style="background: transparent; box-shadow: none; width: auto; height: auto; cursor: pointer;" title="Klik 3x untuk Admin Portal">
-            <img src="${LOGO_BASE64}" alt="Logo Sekolah" style="width: 80px; height: 80px; object-fit: contain; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.15)); margin-bottom: -10px;">
+          <div class="login-logo" id="secret-trigger" style="background: transparent; box-shadow: none; width: auto; height: auto; cursor: default; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none; outline: none;">
+            <img src="${LOGO_BASE64}" alt="Logo Sekolah" draggable="false" style="width: 80px; height: 80px; object-fit: contain; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.15)); margin-bottom: -10px; pointer-events: none; user-select: none; -webkit-user-drag: none; -webkit-touch-callout: none;">
           </div>
           <h2 id="dynamic-greeting">${greeting}</h2>
-          <p class="subtitle">Masuk untuk mengakses dasbor Anda</p>
+          <p class="subtitle">Silakan masuk untuk melihat rincian pembayaran</p>
           
           <form id="form-login-bendahara" class="login-form">
             <div class="form-group form-floating">
