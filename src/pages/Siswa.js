@@ -287,8 +287,9 @@ export function initSiswaEvents() {
           const kelas = (r.Kelas || r.kelas || r.KELAS || '').toString().trim();
           const nis = (r.NIS || r.Nis || r.nis || '').toString().trim();
           const noHp = (r['No. HP'] || r.noHp || r.WA || r.Wa || '').toString().trim();
+          const pin = (r.PIN || r.Pin || r.pin || '').toString().trim();
           if(!nama || !kelas){ skipped++; return; }
-          store.state.siswa.push({ id: uid(), nama, kelas, nis, noHp });
+          store.state.siswa.push({ id: uid(), nama, kelas, nis, noHp, pin });
           added++;
         });
         saveData(`Import selesai: ${added} siswa ditambahkan${skipped?`, ${skipped} baris dilewati`:''}`);

@@ -2,6 +2,7 @@ import { store, saveAuth } from '../state/store.js';
 import { triggerRender } from '../utils/events.js';
 import { escapeHtml, toast } from '../utils/helpers.js';
 import { LOGO_BASE64 } from '../utils/constants.js';
+import { openModal } from '../components/Modal.js';
 
 export function renderLogin() {
   const loginPage = document.getElementById('page-login');
@@ -133,11 +134,16 @@ export function renderLogin() {
   const pwToggles = loginPage.querySelectorAll('.password-toggle');
   pwToggles.forEach(toggle => {
     toggle.addEventListener('click', () => {
-      const input = toggle.previousElementSibling;
-      if (input.type === 'password') {
+      // The input is two siblings before the toggle button (input -> label -> button)
+      let input = toggle.previousElementSibling;
+      if (input && input.tagName.toLowerCase() === 'label') {
+        input = input.previousElementSibling;
+      }
+      
+      if (input && input.type === 'password') {
         input.type = 'text';
         toggle.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>';
-      } else {
+      } else if (input) {
         input.type = 'password';
         toggle.innerHTML = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>';
       }
@@ -267,12 +273,15 @@ export function renderLogin() {
   if(lupaPin) {
     lupaPin.addEventListener('click', (e) => {
       e.preventDefault();
-      Swal.fire({
-        title: 'Lupa PIN?',
-        text: 'Silakan hubungi Bendahara MTs Yasta Bunter untuk melakukan reset PIN Anda.',
-        icon: 'info',
-        confirmButtonColor: 'var(--green)'
-      });
+      openModal(`
+        <div class="modal-head"><h3>Lupa PIN?</h3><button class="close-x" id="modal-close">&times;</button></div>
+        <div class="modal-body">
+          <p style="margin:0; font-size:14px; line-height:1.6; color:var(--ink);">Silakan hubungi Bendahara ${store.state.settings.namaSekolah} untuk melakukan reset PIN Anda.</p>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-primary" id="modal-cancel" style="width:100%;">Tutup</button>
+        </div>
+      `);
     });
   }
 

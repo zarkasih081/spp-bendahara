@@ -1,5 +1,5 @@
 import { store } from '../state/store.js';
-import { currentPeriodeEntry, siswaStatusBulan, siswaTunggakan, fmtRupiah, escapeHtml, BULAN, emptyState, getPeriode, siswaTotalBulan } from '../utils/helpers.js';
+import { currentPeriodeEntry, siswaStatusBulan, siswaTunggakan, fmtRupiah, escapeHtml, BULAN, emptyState, getPeriode, siswaTotalBulan, formatWaLink } from '../utils/helpers.js';
 import { triggerRender } from '../utils/events.js';
 
 function iconMoney(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>`; }
@@ -91,7 +91,7 @@ export function renderDashboard(){
       </div>
       
       <div style="margin-top:20px; display:flex; justify-content:center;">
-        <a href="https://wa.me/${escapeHtml(store.state.settings.noHpBendahara || '')}?text=Halo%20Bendahara%20${encodeURIComponent(store.state.settings.namaSekolah)},%20saya%20${encodeURIComponent(s.nama)}%20ingin%20bertanya%20seputar%20SPP." target="_blank" class="btn" style="background:#25D366; color:#fff; border:none; display:inline-flex; align-items:center; gap:8px;">
+        <a href="${formatWaLink(store.state.settings.noHpBendahara, `Halo Bendahara ${store.state.settings.namaSekolah}, saya ${s.nama} ingin bertanya seputar SPP.`) || '#'}" target="_blank" class="btn" style="background:#25D366; color:#fff; border:none; display:inline-flex; align-items:center; gap:8px;">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
           Hubungi Bendahara via WhatsApp
         </a>
