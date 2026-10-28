@@ -1,6 +1,6 @@
 {
-  "name": "SPPKu",
-  "short_name": "SPPKu",
+  "name": "EduPass",
+  "short_name": "EduPass",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f3f4f6",
