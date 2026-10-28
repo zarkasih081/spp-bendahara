@@ -1,6 +1,8 @@
-import { store, saveData } from '../state/store.js';
-import { getPeriode, escapeHtml, escapeAttr, fmtDate, fmtRupiah, BULAN, downloadFile, toast } from '../utils/helpers.js';
-import { openConfirm } from '../components/Modal.js';
+import { store } from '../../app/state.js';
+import { saveData } from '../../data/database.js';
+import { getPeriode, BULAN, downloadFile, toast } from '../../utils/helpers.js';
+import { escapeHtml, escapeAttr, fmtDate, fmtRupiah } from '../../utils/formatters.js';
+import { openConfirm } from '../../components/Modal.js';
 
 export function renderLaporan(){
   const el = document.getElementById('page-laporan');
@@ -9,9 +11,14 @@ export function renderLaporan(){
   if(store.ui.laporanTahun===null) store.ui.laporanTahun = now.getFullYear();
 
   const kelasList = [...new Set(store.state.siswa.map(s=>s.kelas))].sort();
-  const tahunOptions = [...new Set(getPeriode().map(p=>p.tahun))];
+  const paymentYears = store.state.pembayaran.map(p => p.tahun || (p.tanggal ? new Date(p.tanggal).getFullYear() : null)).filter(Boolean);
+  const tahunOptions = [...new Set([...getPeriode().map(p=>p.tahun), ...paymentYears, store.ui.laporanTahun])].sort((a,b)=>a-b);
 
-  let rows = store.state.pembayaran.filter(p=>p.bulan===store.ui.laporanBulan && p.tahun===store.ui.laporanTahun);
+  let rows = store.state.pembayaran.filter(p=>{
+    const pBulan = p.bulan || (p.tanggal ? new Date(p.tanggal).getMonth() + 1 : null);
+    const pTahun = p.tahun || (p.tanggal ? new Date(p.tanggal).getFullYear() : null);
+    return pBulan === store.ui.laporanBulan && pTahun === store.ui.laporanTahun;
+  });
   if(store.ui.laporanKelas){
     const idsInKelas = new Set(store.state.siswa.filter(s=>s.kelas===store.ui.laporanKelas).map(s=>s.id));
     rows = rows.filter(p=>idsInKelas.has(p.siswaId));
@@ -55,7 +62,7 @@ export function renderLaporan(){
   `;
   const tbody = document.getElementById('laporan-tbody');
   if(rows.length===0){
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">Belum ada transaksi pada periode ini.</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">Belum ada transaksi pada periode ini.</td></tr>`;
   } else {
     tbody.innerHTML = rows.map(p=>{
       const s = store.state.siswa.find(x=>x.id===p.siswaId) || {nama:'(dihapus)', kelas:'-'};

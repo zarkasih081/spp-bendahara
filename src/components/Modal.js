@@ -1,4 +1,4 @@
-import { escapeHtml } from '../utils/helpers.js';
+import { escapeHtml } from '../utils/formatters.js';
 
 export function openModal(html, size){
   const overlay = document.getElementById('modal-overlay');

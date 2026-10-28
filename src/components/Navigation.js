@@ -1,9 +1,11 @@
-import { store, saveAuth } from '../state/store.js';
+import { store } from '../app/state.js';
+import { saveAuth } from '../data/authStorage.js';
 import { triggerRender } from '../utils/events.js';
 
 export const PAGE_META = {
   dashboard: { title:'Dashboard', sub:'Ringkasan pemasukan SPP dan status pembayaran' },
   siswa: { title:'Data Siswa', sub:'Kelola daftar siswa dan kelas' },
+  absensi: { title:'Absensi Siswa', sub:'Scan QR kartu siswa dan pantau kehadiran real-time' },
   bayar: { title:'Input Pembayaran', sub:'Catat pembayaran SPP dan cetak kwitansi' },
   riwayat: { title:'Riwayat & Tunggakan', sub:'Status pembayaran per siswa' },
   laporan: { title:'Laporan', sub:'Rekap pemasukan SPP per periode' },
@@ -16,6 +18,7 @@ function iconPlus(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="curren
 function iconClock(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3.5 2"/></svg>`; }
 function iconChart(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>`; }
 function iconGear(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="3"/><path d="M12 3v2M12 19v2M4.2 4.2l1.4 1.4M18.4 18.4l1.4 1.4M3 12h2M19 12h2M4.2 19.8l1.4-1.4M18.4 5.6l1.4-1.4"/></svg>`; }
+function iconScan(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>`; }
 
 function iconChevronLeft(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>`; }
 function iconHamburger(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>`; }
@@ -23,6 +26,7 @@ function iconHamburger(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="c
 export const NAV_ITEMS = [
   { key:'dashboard', label:'Dashboard', group:'Ringkasan', icon:iconGrid() },
   { key:'siswa', label:'Data Siswa', group:'Data', icon:iconUsers() },
+  { key:'absensi', label:'Absensi Siswa', group:'Data', icon:iconScan() },
   { key:'bayar', label:'Input Pembayaran', group:'Data', icon:iconPlus() },
   { key:'riwayat', label:'Riwayat & Tunggakan', group:'Data', icon:iconClock() },
   { key:'laporan', label:'Laporan', group:'Laporan', icon:iconChart() },
@@ -47,6 +51,10 @@ export function renderNav(){
       <div class="bottom-nav-item ${store.ui.page==='dashboard'?'active':''}" data-bottom-nav="dashboard">
         ${iconGrid()}
         <span>Beranda</span>
+      </div>
+      <div class="bottom-nav-item ${store.ui.page==='absensi'?'active':''}" data-bottom-nav="absensi">
+        ${iconScan()}
+        <span>Absensi</span>
       </div>
       <div class="bottom-nav-item ${store.ui.page==='riwayat'?'active':''}" data-bottom-nav="riwayat">
         ${iconClock()}
@@ -144,6 +152,15 @@ export function renderNav(){
       }
       overlay.classList.add('active');
     });
+  }
+
+  // Hamburger is only for Bendahara (mobile view)
+  if (hamburger) {
+    if (!user || user.role === 'siswa' || store.ui.page === 'login') {
+      hamburger.style.display = 'none';
+    } else {
+      hamburger.style.display = '';
+    }
   }
 
   // Update sidebar footer with timestamp

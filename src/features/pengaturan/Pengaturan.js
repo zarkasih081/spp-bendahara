@@ -1,7 +1,10 @@
-import { store, defaultState, saveData, hashPassword } from '../state/store.js';
-import { triggerRender } from '../utils/events.js';
-import { escapeAttr, BULAN, toast, downloadFile } from '../utils/helpers.js';
-import { openConfirm } from '../components/Modal.js';
+import { store } from '../../app/state.js';
+import { defaultState, saveData } from '../../data/database.js';
+import { hashPassword } from '../../data/authStorage.js';
+import { triggerRender } from '../../utils/events.js';
+import { BULAN, toast, downloadFile } from '../../utils/helpers.js';
+import { escapeAttr } from '../../utils/formatters.js';
+import { openConfirm } from '../../components/Modal.js';
 
 export function renderPengaturan(){
   const el = document.getElementById('page-pengaturan');
@@ -14,6 +17,11 @@ export function renderPengaturan(){
       <div class="form-row">
         <div class="form-group"><label>Nama Bendahara</label><input id="set-bendahara" style="width:100%;" value="${escapeAttr(s.bendahara)}" placeholder="Tercetak di kwitansi"></div>
         <div class="form-group"><label>Tahun Ajaran</label><input id="set-ta" style="width:100%;" value="${escapeAttr(s.tahunAjaran)}" placeholder="cth. 2025/2026"></div>
+      </div>
+      <div class="form-group">
+        <label>No. WhatsApp Bendahara (opsional)</label>
+        <input id="set-nohp-bendahara" style="width:100%;" value="${escapeAttr(s.noHpBendahara || '')}" placeholder="cth. 081234567890">
+        <div class="helper-text">Digunakan untuk tombol konsultasi WhatsApp pada portal siswa.</div>
       </div>
       <div class="form-group" style="margin-top: 14px;">
         <label>Kata Sandi (PIN) Bendahara Baru</label>
@@ -35,7 +43,28 @@ export function renderPengaturan(){
         </div>
         <div class="form-group"><label>Tahun Awal</label><input id="set-tahun-mulai" type="number" style="width:100%;" value="${s.tahunMulai}"></div>
       </div>
-      <div class="helper-text">Periode ini menentukan 12 bulan yang dihitung sebagai satu tahun ajaran untuk perhitungan tunggakan.</div>
+    </div>
+    <div class="card" style="max-width:560px;">
+      <h3>Jadwal Absensi & Scanner QR</h3>
+      <div class="card-sub">Waktu batas keterlambatan dan suara scanner kartu QR</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Jam Batas Masuk (Tepat Waktu)</label>
+          <input id="set-jam-masuk" type="time" style="width:100%;" value="${s.jamMasuk || '07:15'}">
+          <div class="helper-text">Scan setelah jam ini akan otomatis berstatus "Terlambat".</div>
+        </div>
+        <div class="form-group">
+          <label>Jam Pulang Sekolah</label>
+          <input id="set-jam-pulang" type="time" style="width:100%;" value="${s.jamPulang || '14:00'}">
+          <div class="helper-text">Waktu standar kepulangan siswa.</div>
+        </div>
+      </div>
+      <div class="form-group" style="margin-top:10px;">
+        <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+          <input type="checkbox" id="set-beep-audio" ${s.beepAudio !== false ? 'checked' : ''}>
+          <span>Aktifkan Suara Beep / Chime saat Scan Kartu Berhasil</span>
+        </label>
+      </div>
     </div>
     <button class="btn btn-primary" id="btn-save-settings">Simpan Pengaturan</button>
 
@@ -60,6 +89,7 @@ export function renderPengaturan(){
   document.getElementById('btn-save-settings').addEventListener('click', async ()=>{
     s.namaSekolah = document.getElementById('set-nama').value.trim() || s.namaSekolah;
     s.bendahara = document.getElementById('set-bendahara').value.trim();
+    s.noHpBendahara = document.getElementById('set-nohp-bendahara').value.trim();
     s.tahunAjaran = document.getElementById('set-ta').value.trim() || s.tahunAjaran;
     
     const newPass = document.getElementById('set-admin-pass').value.trim();
@@ -70,11 +100,18 @@ export function renderPengaturan(){
     s.nominalIjazah = parseInt(document.getElementById('set-nominal-ijazah').value || '0',10) || s.nominalIjazah;
     s.bulanMulai = +document.getElementById('set-bulan-mulai').value;
     s.tahunMulai = parseInt(document.getElementById('set-tahun-mulai').value,10) || s.tahunMulai;
+    store.ui.activeTahunMulai = s.tahunMulai;
+    s.jamMasuk = document.getElementById('set-jam-masuk').value || s.jamMasuk || '07:15';
+    s.jamPulang = document.getElementById('set-jam-pulang').value || s.jamPulang || '14:00';
+    s.beepAudio = document.getElementById('set-beep-audio').checked;
     saveData('Pengaturan disimpan');
+    triggerRender();
   });
   document.getElementById('btn-reset-data').addEventListener('click', ()=>{
     openConfirm('Hapus SEMUA data siswa dan pembayaran? Tindakan ini tidak bisa dibatalkan.', ()=>{
       store.state = defaultState();
+      store.ui.activeTahunMulai = store.state.settings.tahunMulai;
+      store.ui.bayarSiswaId = null;
       store.isDataCorrupt = false;
       saveData('Semua data telah dihapus');
       triggerRender();
@@ -98,7 +135,13 @@ export function renderPengaturan(){
         if(parsed && typeof parsed.settings === 'object' && Array.isArray(parsed.siswa) && Array.isArray(parsed.pembayaran)) {
            const d = defaultState();
            parsed.settings = Object.assign({}, d.settings, parsed.settings);
+           if (!Array.isArray(parsed.absensi)) parsed.absensi = [];
+           parsed.siswa.forEach(s => {
+             if (!s.noHp && s.telepon) { s.noHp = s.telepon; delete s.telepon; }
+           });
            store.state = parsed;
+           store.ui.activeTahunMulai = parsed.settings.tahunMulai;
+           store.ui.bayarSiswaId = null;
            store.isDataCorrupt = false;
            saveData('Data berhasil dipulihkan dari backup');
            triggerRender();

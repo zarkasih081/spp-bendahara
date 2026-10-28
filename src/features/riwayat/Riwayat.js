@@ -1,9 +1,9 @@
-import { store } from '../state/store.js';
-import { currentPeriodeEntry, getPeriode, siswaTunggakan, siswaStatusBulan, siswaTotalBulan, escapeHtml, escapeAttr, fmtRupiah, BULAN, formatWaLink, emptyState } from '../utils/helpers.js';
-import { triggerRender } from '../utils/events.js';
-import { openModal } from '../components/Modal.js';
-
-
+import { store } from '../../app/state.js';
+import { currentPeriodeEntry, getPeriode, siswaTunggakan, siswaStatusBulan, siswaTotalBulan, BULAN, emptyState } from '../../utils/helpers.js';
+import { escapeHtml, escapeAttr, fmtRupiah, formatWaLink } from '../../utils/formatters.js';
+import { triggerRender } from '../../utils/events.js';
+import { openModal } from '../../components/Modal.js';
+import { cetakKwitansi } from '../pembayaran/kwitansi.js';
 
 export function renderRiwayat(){
   const el = document.getElementById('page-riwayat');
@@ -16,54 +16,157 @@ export function renderRiwayat(){
     
     const periode = getPeriode();
     const t = siswaTunggakan(s.id);
+    const nominal = store.state.settings.nominalSPP;
+    const nominalIjazah = store.state.settings.nominalIjazah || 500000;
     
     // Get their payments
     const payments = store.state.pembayaran.filter(p => p.siswaId === s.id).sort((a,b)=> new Date(b.tanggal) - new Date(a.tanggal));
-    
+    const ijazahTerbayar = payments.filter(p=>p.jenis==='ijazah').reduce((sum, p)=>sum+p.nominal, 0);
+    const cur = currentPeriodeEntry();
+
     el.innerHTML = `
+      <!-- 12-Month Academic Year Payment Timeline -->
       <div class="card">
-        <h3>Status Pembayaran per Bulan</h3>
-        <div class="card-sub">Tahun Ajaran ${store.state.settings.tahunAjaran}</div>
-        <div class="month-grid" style="margin-top:16px;">
-          ${periode.map(p=>{
+        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+          <div>
+            <h3 style="margin:0; font-size:16px;">Jadwal & Status SPP per Bulan</h3>
+            <div class="card-sub" style="margin-top:2px;">Tahun Ajaran ${escapeHtml(store.state.settings.tahunAjaran)} • ${t.jumlahBulan > 0 ? `<span style="color:#DC2626; font-weight:700;">${t.jumlahBulan} Bulan Menunggak</span>` : `<span style="color:#059669; font-weight:700;">Semua Bulan Berjalan Lunas</span>`}</div>
+          </div>
+        </div>
+
+        <div class="student-academic-grid">
+          ${periode.map(p => {
             const total = siswaTotalBulan(s.id, p.bulan, p.tahun);
-            const nominal = store.state.settings.nominalSPP;
-            const cls = total>=nominal ? 'paid' : '';
-            return `<div class="month-pill ${cls}">${BULAN[p.bulan-1]} '${String(p.tahun).slice(2)}<span class="chk">${total>=nominal?'✓ Lunas':total>0?fmtRupiah(total):'—'}</span></div>`;
+            const isPastOrCurrent = (p.tahun < cur.tahun) || (p.tahun === cur.tahun && p.bulan <= cur.bulan);
+            
+            let cardClass = 'future';
+            let chipClass = 'future';
+            let chipText = 'Akan Datang';
+
+            if (total >= nominal) {
+              cardClass = 'paid';
+              chipClass = 'paid';
+              chipText = '✓ Lunas';
+            } else if (total > 0) {
+              cardClass = 'due';
+              chipClass = 'due';
+              chipText = `Kurang ${fmtRupiah(nominal - total)}`;
+            } else if (isPastOrCurrent) {
+              cardClass = 'due';
+              chipClass = 'due';
+              chipText = '! Menunggak';
+            }
+
+            const matchingPayment = payments.find(pay => pay.bulan === p.bulan && pay.tahun === p.tahun && (!pay.jenis || pay.jenis === 'spp'));
+
+            return `
+              <div class="timeline-month-card ${cardClass}">
+                <div class="tm-top">
+                  <span class="tm-month-name">${BULAN[p.bulan-1]} ${p.tahun}</span>
+                  <span class="tm-chip ${chipClass}">${chipText}</span>
+                </div>
+                <div class="tm-amount">${total > 0 ? fmtRupiah(total) : fmtRupiah(nominal)}</div>
+                <div class="tm-foot">
+                  <span>${total >= nominal ? 'Kewajiban: Lunas' : `Kewajiban: ${fmtRupiah(nominal)}`}</span>
+                  ${matchingPayment ? `
+                    <button type="button" class="btn-tm-receipt" data-pay-id="${matchingPayment.id}">
+                      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                      <span>Kwitansi</span>
+                    </button>
+                  ` : `<span>${total >= nominal ? 'Terbayar' : (isPastOrCurrent ? 'Belum bayar' : 'Jatuh tempo tgl 10')}</span>`}
+                </div>
+              </div>
+            `;
           }).join('')}
         </div>
       </div>
       
-      <div class="card" style="margin-top:16px;">
-        <h3>Status Pembayaran Ijazah</h3>
-        <div style="display:flex; justify-content:space-between; margin-top:8px;">
-          <span>Total Tagihan: <strong>${fmtRupiah(store.state.settings.nominalIjazah || 500000)}</strong></span>
-          <span style="color:var(--rust); font-weight:600;">Sisa: ${fmtRupiah(Math.max(0, (store.state.settings.nominalIjazah || 500000) - payments.filter(p=>p.jenis==='ijazah').reduce((sum, p)=>sum+p.nominal, 0)))}</span>
+      <!-- Status Tabungan Ijazah -->
+      <div class="card" style="margin-top:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+          <div>
+            <h3 style="margin:0; font-size:15px;">Administrasi / Tabungan Ijazah</h3>
+            <div class="card-sub" style="margin-top:2px;">Biaya kelulusan dan penulisan ijazah resmi</div>
+          </div>
+          <span class="badge ${ijazahTerbayar >= nominalIjazah ? 'lunas' : 'parsial'}">
+            ${ijazahTerbayar >= nominalIjazah ? 'Lunas 100%' : `Sisa ${fmtRupiah(Math.max(0, nominalIjazah - ijazahTerbayar))}`}
+          </span>
+        </div>
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-top:14px;">
+          <div style="background:var(--paper-dim); padding:12px 14px; border-radius:10px; border:1px solid var(--line);">
+            <div style="font-size:11px; color:var(--ink-soft); text-transform:uppercase;">Total Ketetapan</div>
+            <div style="font-size:16px; font-weight:800; font-family:'IBM Plex Mono', monospace; margin-top:2px;">${fmtRupiah(nominalIjazah)}</div>
+          </div>
+          <div style="background:rgba(16,185,129,0.08); padding:12px 14px; border-radius:10px; border:1px solid rgba(16,185,129,0.25);">
+            <div style="font-size:11px; color:#059669; text-transform:uppercase; font-weight:600;">Sudah Terbayar</div>
+            <div style="font-size:16px; font-weight:800; font-family:'IBM Plex Mono', monospace; color:#10B981; margin-top:2px;">${fmtRupiah(ijazahTerbayar)}</div>
+          </div>
+          <div style="background:rgba(239,68,68,0.08); padding:12px 14px; border-radius:10px; border:1px solid rgba(239,68,68,0.25);">
+            <div style="font-size:11px; color:#DC2626; text-transform:uppercase; font-weight:600;">Sisa Pembayaran</div>
+            <div style="font-size:16px; font-weight:800; font-family:'IBM Plex Mono', monospace; color:#EF4444; margin-top:2px;">${fmtRupiah(Math.max(0, nominalIjazah - ijazahTerbayar))}</div>
+          </div>
         </div>
       </div>
       
-      <div class="card" style="margin-top:16px;">
-        <h3>Riwayat Transaksi</h3>
-        ${payments.length === 0 ? '<div class="empty-state">Belum ada transaksi pembayaran.</div>' : `
-          <div class="transaction-list" style="margin-top:16px;">
-            ${payments.map(p=>`
+      <!-- Riwayat Transaksi & Kwitansi -->
+      <div class="card" style="margin-top:18px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+          <div>
+            <h3 style="margin:0; font-size:15px;">Daftar Transaksi & Kwitansi Resmi</h3>
+            <div class="card-sub" style="margin-top:2px;">Seluruh setoran yang telah diverifikasi oleh Bendahara</div>
+          </div>
+        </div>
+        ${payments.length === 0 ? '<div class="empty-state">Belum ada transaksi pembayaran yang tercatat.</div>' : `
+          <div class="transaction-list" style="margin-top:12px;">
+            ${payments.map(p => `
               <div class="transaction-item">
                 <div class="ti-left">
-                  <div class="ti-icon">
+                  <div class="ti-icon" style="${p.jenis === 'ijazah' ? 'background:rgba(59,130,246,0.12); color:#2563EB;' : ''}">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
                   </div>
                   <div>
-                    <div class="ti-title">${(!p.jenis || p.jenis==='spp') ? 'SPP Bulan ' + BULAN[p.bulan-1] + ' ' + p.tahun : 'Pembayaran Ijazah'}</div>
-                    <div class="ti-date">${new Date(p.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}</div>
+                    <div class="ti-title">${(!p.jenis || p.jenis === 'spp') ? 'SPP Bulan ' + BULAN[p.bulan-1] + ' ' + p.tahun : 'Pembayaran Ijazah'}</div>
+                    <div class="ti-date">
+                      ${new Date(p.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}
+                      ${p.noKwitansi ? ` • <span class="monospace" style="color:var(--primary); font-weight:600;">${escapeHtml(p.noKwitansi)}</span>` : ''}
+                    </div>
                   </div>
                 </div>
-                <div class="ti-amount">+ ${fmtRupiah(p.nominal)}</div>
+                <div style="display:flex; align-items:center; gap:12px;">
+                  <div class="ti-amount">+ ${fmtRupiah(p.nominal)}</div>
+                  <button type="button" class="btn btn-secondary btn-print-single-pay" data-pay-id="${p.id}" style="padding:6px 12px; font-size:12px; display:inline-flex; align-items:center; gap:5px;" title="Buka & Cetak Kwitansi Resmi">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M6 9V3h12v6M6 18h12v4H6v-4zM4 9h16v7H4z"/></svg>
+                    <span>Kwitansi</span>
+                  </button>
+                </div>
               </div>
             `).join('')}
           </div>
         `}
       </div>
     `;
+
+    // Attach kwitansi click listeners
+    const openReceiptForPayment = (paymentId) => {
+      const p = payments.find(x => x.id === paymentId);
+      if (p) {
+        const months = (!p.jenis || p.jenis === 'spp') ? [{ bulan: p.bulan, tahun: p.tahun }] : [];
+        cetakKwitansi(s, months, p.nominal, p.noKwitansi || 'KW-ONLINE', p.tanggal, p.jenis || 'spp');
+      }
+    };
+
+    el.querySelectorAll('.btn-tm-receipt').forEach(btn => {
+      btn.addEventListener('click', () => {
+        openReceiptForPayment(btn.dataset.payId);
+      });
+    });
+
+    el.querySelectorAll('.btn-print-single-pay').forEach(btn => {
+      btn.addEventListener('click', () => {
+        openReceiptForPayment(btn.dataset.payId);
+      });
+    });
+
     return;
   }
 
@@ -79,6 +182,9 @@ export function renderRiwayat(){
     });
     return;
   }
+  const wasSearchFocused = document.activeElement?.id === 'riwayat-search';
+  const selStart = wasSearchFocused ? document.activeElement.selectionStart : null;
+  const selEnd = wasSearchFocused ? document.activeElement.selectionEnd : null;
   const kelasList = [...new Set(store.state.siswa.map(s=>s.kelas))].sort();
   const cur = currentPeriodeEntry();
 
@@ -125,7 +231,7 @@ export function renderRiwayat(){
   const paged = rows.slice((store.ui.pageRiwayat-1)*ITEMS_PER_PAGE, store.ui.pageRiwayat*ITEMS_PER_PAGE);
 
   if(paged.length===0){
-    tbody.innerHTML = `<tr class="empty-row"><td colspan="6">Tidak ada data yang cocok dengan filter.</td></tr>`;
+    tbody.innerHTML = `<tr class="empty-row"><td colspan="7">Tidak ada data yang cocok dengan filter.</td></tr>`;
   } else {
     tbody.innerHTML = paged.map(r=>`<tr>
       <td>${escapeHtml(r.s.nama)}</td>
@@ -155,7 +261,12 @@ export function renderRiwayat(){
     if(btnNext) btnNext.addEventListener('click', ()=>{ store.ui.pageRiwayat++; renderRiwayat(); });
   }
 
-  document.getElementById('riwayat-search').addEventListener('input', e=>{ store.ui.riwayatSearch=e.target.value; store.ui.pageRiwayat=1; renderRiwayat(); });
+  const searchInputEl = document.getElementById('riwayat-search');
+  searchInputEl.addEventListener('input', e=>{ store.ui.riwayatSearch=e.target.value; store.ui.pageRiwayat=1; renderRiwayat(); });
+  if (wasSearchFocused && searchInputEl) {
+    searchInputEl.focus();
+    if (selStart !== null) searchInputEl.setSelectionRange(selStart, selEnd);
+  }
   document.getElementById('riwayat-kelas-filter').addEventListener('change', e=>{ store.ui.riwayatKelasFilter=e.target.value; store.ui.pageRiwayat=1; renderRiwayat(); });
   document.getElementById('riwayat-status-filter').addEventListener('change', e=>{ store.ui.riwayatStatusFilter=e.target.value; store.ui.pageRiwayat=1; renderRiwayat(); });
   tbody.querySelectorAll('[data-detail]').forEach(b=>b.addEventListener('click', ()=>openDetailSiswa(b.dataset.detail)));

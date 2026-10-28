@@ -1,13 +1,18 @@
-import { store, saveData } from '../state/store.js';
-import { currentPeriodeEntry, siswaStatusBulan, escapeHtml, escapeAttr, uid, toast } from '../utils/helpers.js';
- 
-import { openModal, closeModal, openConfirm } from '../components/Modal.js';
-import * as XLSX from 'xlsx';
+import { store } from '../../app/state.js';
+import { currentPeriodeEntry, siswaStatusBulan, toast } from '../../utils/helpers.js';
+import { escapeHtml, escapeAttr } from '../../utils/formatters.js';
+import { openModal, closeModal, openConfirm } from '../../components/Modal.js';
+import { handleImportExcel, downloadSiswaTemplate } from './siswaImport.js';
+import { getSiswaById, addSiswa, updateSiswa, deleteSiswa, bulkDeleteSiswa, promoteSiswa, validateSiswa } from './siswaService.js';
+import { renderStudentCardHtml } from '../absensi/qrCardGenerator.js';
 
 let selectedSiswaIds = new Set();
 
 export function renderSiswa(){
   const el = document.getElementById('page-siswa');
+  const wasSearchFocused = document.activeElement?.id === 'siswa-search';
+  const selStart = wasSearchFocused ? document.activeElement.selectionStart : null;
+  const selEnd = wasSearchFocused ? document.activeElement.selectionEnd : null;
   const kelasList = [...new Set(store.state.siswa.map(s=>s.kelas))].sort();
 
   let filtered = store.state.siswa.filter(s=>{
@@ -71,8 +76,9 @@ export function renderSiswa(){
         <td>${escapeHtml(s.noHp||'-')}</td>
         <td class="num"><span class="badge ${st}">${st==='lunas'?'Lunas':st==='parsial'?'Sebagian':'Belum'}</span></td>
         <td>
-          <button class="btn btn-sm btn-ghost" data-edit-siswa="${s.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h4L18 10l-4-4L4 16v4z"/></svg></button>
-          <button class="btn btn-sm btn-ghost" data-del-siswa="${s.id}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
+          <button class="btn btn-sm btn-ghost" data-qr-siswa="${s.id}" title="Kartu QR Siswa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:14px;height:14px;"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
+          <button class="btn btn-sm btn-ghost" data-edit-siswa="${s.id}" title="Ubah Siswa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h4L18 10l-4-4L4 16v4z"/></svg></button>
+          <button class="btn btn-sm btn-ghost" data-del-siswa="${s.id}" title="Hapus Siswa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
         </td>
       </tr>`;
     }).join('');
@@ -92,12 +98,54 @@ export function renderSiswa(){
     if(btnNext) btnNext.addEventListener('click', ()=>{ store.ui.pageSiswa++; renderSiswa(); });
   }
 
-  document.getElementById('siswa-search').addEventListener('input', e=>{ store.ui.siswaSearch = e.target.value; store.ui.pageSiswa=1; renderSiswa(); });
+  const searchInputEl = document.getElementById('siswa-search');
+  searchInputEl.addEventListener('input', e=>{ store.ui.siswaSearch = e.target.value; store.ui.pageSiswa=1; renderSiswa(); });
+  if (wasSearchFocused && searchInputEl) {
+    searchInputEl.focus();
+    if (selStart !== null) searchInputEl.setSelectionRange(selStart, selEnd);
+  }
   document.getElementById('siswa-kelas-filter').addEventListener('change', e=>{ store.ui.siswaKelasFilter = e.target.value; store.ui.pageSiswa=1; renderSiswa(); });
   document.getElementById('btn-add-siswa').addEventListener('click', ()=>openSiswaModal());
   document.getElementById('btn-import').addEventListener('click', ()=>document.getElementById('import-file-input').click());
   tbody.querySelectorAll('[data-edit-siswa]').forEach(b=>b.addEventListener('click', ()=>openSiswaModal(b.dataset.editSiswa)));
-  tbody.querySelectorAll('[data-del-siswa]').forEach(b=>b.addEventListener('click', ()=>deleteSiswa(b.dataset.delSiswa)));
+  
+  tbody.querySelectorAll('[data-qr-siswa]').forEach(b=>b.addEventListener('click', async ()=>{
+    const s = getSiswaById(b.dataset.qrSiswa);
+    if (!s) return;
+    const cardHtml = await renderStudentCardHtml(s);
+    openModal(`
+      <div class="modal-head">
+        <h3>Kartu Identitas Siswa & QR</h3>
+        <button class="close-x" id="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" style="display:flex; justify-content:center; padding:24px 10px;">
+        ${cardHtml}
+      </div>
+      <div class="modal-foot">
+        <button class="btn" id="modal-cancel">Tutup</button>
+        <button class="btn btn-primary" id="btn-print-single-modal">Cetak Kartu</button>
+      </div>
+    `);
+    document.getElementById('btn-print-single-modal')?.addEventListener('click', () => {
+      closeModal();
+      const printArea = document.getElementById('kwitansi-print-area');
+      if (printArea) {
+        printArea.innerHTML = `<div class="print-cards-container single">${cardHtml}</div>`;
+        setTimeout(() => window.print(), 100);
+      }
+    });
+  }));
+  
+  tbody.querySelectorAll('[data-del-siswa]').forEach(b=>b.addEventListener('click', ()=>{
+    const id = b.dataset.delSiswa;
+    const s = getSiswaById(id);
+    if(s) {
+      openConfirm(`Hapus data "${s.nama}"? Riwayat pembayarannya juga akan dihapus.`, ()=>{
+        deleteSiswa(id);
+        renderSiswa();
+      });
+    }
+  }));
 
   // Bulk Actions UI Update
   const btnBulkDelete = document.getElementById('btn-bulk-delete');
@@ -141,18 +189,13 @@ export function renderSiswa(){
 
   // Template Download
   document.getElementById('btn-download-template').addEventListener('click', () => {
-    const ws = XLSX.utils.json_to_sheet([{ Nama: '', Kelas: '', NIS: '', WA: '', PIN: '' }]);
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "FormatSiswa");
-    XLSX.writeFile(wb, "Template_Siswa_SPP.xlsx");
+    downloadSiswaTemplate();
   });
 
   btnBulkDelete.addEventListener('click', () => {
     openConfirm(`Hapus ${selectedSiswaIds.size} siswa terpilih secara permanen? Data pembayaran mereka juga akan hilang.`, () => {
-      store.state.siswa = store.state.siswa.filter(s => !selectedSiswaIds.has(s.id));
-      store.state.pembayaran = store.state.pembayaran.filter(p => !selectedSiswaIds.has(p.siswaId));
+      bulkDeleteSiswa(Array.from(selectedSiswaIds));
       selectedSiswaIds.clear();
-      saveData('Data siswa masal dihapus');
       renderSiswa();
     });
   });
@@ -176,11 +219,8 @@ export function renderSiswa(){
       const kelasBaru = document.getElementById('bulk-kelas-baru').value.trim();
       if(!kelasBaru) { toast('Kelas tujuan wajib diisi', 'warning'); return; }
       
-      store.state.siswa.forEach(s => {
-        if(selectedSiswaIds.has(s.id)) s.kelas = kelasBaru;
-      });
+      promoteSiswa(Array.from(selectedSiswaIds), kelasBaru);
       selectedSiswaIds.clear();
-      saveData('Siswa berhasil dinaikkan kelas');
       closeModal();
       renderSiswa();
     });
@@ -188,7 +228,7 @@ export function renderSiswa(){
 }
 
 function openSiswaModal(id){
-  const editing = id ? store.state.siswa.find(s=>s.id===id) : null;
+  const editing = id ? getSiswaById(id) : null;
   openModal(`
     <div class="modal-head"><h3>${editing?'Edit Siswa':'Tambah Siswa'}</h3><button class="close-x" id="modal-close">&times;</button></div>
     <div class="modal-body">
@@ -235,70 +275,29 @@ function openSiswaModal(id){
     // Clear previous errors
     [inNama, inKelas, inNis].forEach(el => el.classList.remove('error'));
     
-    if(!nama || !kelas){ 
-      if(!nama) inNama.classList.add('error');
-      if(!kelas) inKelas.classList.add('error');
-      toast('Nama dan kelas wajib diisi', 'warning'); 
-      return; 
+    const validation = validateSiswa(nama, kelas, nis, editing ? editing.id : null);
+    if (!validation.valid) {
+      if(validation.error.includes('Nama')) { inNama.classList.add('error'); inKelas.classList.add('error'); }
+      if(validation.error.includes('NIS')) inNis.classList.add('error');
+      toast(validation.error, 'warning');
+      return;
     }
-    if(nis){
-      const duplikat = store.state.siswa.find(s => s.nis === nis && (!editing || s.id !== editing.id));
-      if(duplikat){ 
-        inNis.classList.add('error');
-        toast('Gagal: NIS sudah terdaftar untuk siswa lain', 'error'); 
-        return; 
-      }
-    }
+
     if(editing){
-      editing.nama = nama; editing.kelas = kelas; editing.nis = nis; editing.noHp = noHp; editing.pin = pin;
-      saveData('Data siswa diperbarui');
+      updateSiswa(editing.id, { nama, kelas, nis, noHp, pin });
     } else {
-      store.state.siswa.push({ id: uid(), nama, kelas, nis, noHp, pin });
-      saveData('Siswa baru ditambahkan');
+      addSiswa({ nama, kelas, nis, noHp, pin });
     }
     closeModal(); renderSiswa();
-  });
-}
-
-function deleteSiswa(id){
-  const s = store.state.siswa.find(x=>x.id===id);
-  if(!s) return;
-  openConfirm(`Hapus data "${s.nama}"? Riwayat pembayarannya juga akan dihapus.`, ()=>{
-    store.state.siswa = store.state.siswa.filter(x=>x.id!==id);
-    store.state.pembayaran = store.state.pembayaran.filter(p=>p.siswaId!==id);
-    saveData('Data siswa dihapus');
-    renderSiswa();
   });
 }
 
 export function initSiswaEvents() {
   document.getElementById('import-file-input').addEventListener('change', function(e){
     const file = e.target.files[0];
-    if(!file) return;
-    const reader = new FileReader();
-    reader.onload = function(evt){
-      try{
-        const wb = XLSX.read(evt.target.result, { type:'array' });
-        const sheet = wb.Sheets[wb.SheetNames[0]];
-        const rows = XLSX.utils.sheet_to_json(sheet, { defval:'' });
-        let added = 0, skipped = 0;
-        rows.forEach(r=>{
-          const nama = (r.Nama || r.nama || r.NAMA || '').toString().trim();
-          const kelas = (r.Kelas || r.kelas || r.KELAS || '').toString().trim();
-          const nis = (r.NIS || r.Nis || r.nis || '').toString().trim();
-          const noHp = (r['No. HP'] || r.noHp || r.WA || r.Wa || '').toString().trim();
-          const pin = (r.PIN || r.Pin || r.pin || '').toString().trim();
-          if(!nama || !kelas){ skipped++; return; }
-          store.state.siswa.push({ id: uid(), nama, kelas, nis, noHp, pin });
-          added++;
-        });
-        saveData(`Import selesai: ${added} siswa ditambahkan${skipped?`, ${skipped} baris dilewati`:''}`);
-        renderSiswa();
-      }catch(err){
-        toast('Gagal membaca file. Pastikan format kolom: Nama, Kelas, NIS, WA', 'error');
-      }
+    handleImportExcel(file, () => {
+      renderSiswa();
       e.target.value = '';
-    };
-    reader.readAsArrayBuffer(file);
+    });
   });
 }

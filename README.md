@@ -1,14 +1,19 @@
-# SPPKu — Aplikasi Bendahara Sekolah
+# EduPass — Portal Presensi QR & Keuangan Sekolah
 
-![SPPKu Banner](public/icon-512.png)
+![EduPass Banner](public/icon-512.png)
 
-SPPKu adalah aplikasi berbasis web (*Progressive Web App* / PWA) yang dirancang khusus untuk membantu bendahara sekolah dalam mencatat dan mengelola pembayaran SPP serta Ijazah secara digital, cepat, dan transparan. Aplikasi ini sepenuhnya berjalan di sisi klien (browser) tanpa memerlukan *backend server* atau *database* terpusat, menjadikannya sangat responsif dan aman untuk penggunaan pribadi.
+EduPass adalah aplikasi berbasis web (*Progressive Web App* / PWA) yang dirancang khusus untuk memfasilitasi absensi siswa berbasis kartu QR otomatis serta membantu bendahara sekolah dalam mencatat dan mengelola pembayaran SPP serta Ijazah secara digital, cepat, dan transparan. Aplikasi ini sepenuhnya berjalan di sisi klien (browser) tanpa memerlukan *backend server* atau *database* terpusat, menjadikannya sangat responsif dan aman untuk penggunaan sekolah.
 
 ## ✨ Fitur Utama
 
+- 📱 **Sistem Absensi Kartu QR Real-Time**
+  - **Scanner QR Kiosk Mode:** Pemindai kartu QR otomatis dengan kamera laptop/HP atau barcode scanner USB, jam digital WIB, dan feedback suara beep.
+  - **Cetak Kartu Siswa:** Pembuat kartu pelajar digital elegan dengan QR code beresolusi tinggi, logo sekolah, dan identitas siswa yang siap dicetak.
+  - **Portal Siswa/Orang Tua:** Pantau status kehadiran harian, kalender kehadiran (heat map 7 hari), dan rangkuman bulanan.
+  - **Notifikasi WhatsApp Otomatis:** Tombol 1-klik untuk mengirim kabar kehadiran langsung ke nomor WhatsApp orang tua.
 - 🔒 **Sistem Login Ganda (Role-Based)**
-  - **Bendahara:** Mengelola data siswa, input pembayaran, pengaturan nominal, dan melihat laporan. Dilengkapi dengan proteksi PIN/Sandi *Hash SHA-256*.
-  - **Siswa:** Dapat masuk menggunakan NIS dan PIN masing-masing untuk memantau riwayat pembayaran, sisa tunggakan, dan tagihan (Read-only).
+  - **Bendahara / Petugas:** Mengelola data siswa, absensi, input pembayaran, pengaturan jam masuk/pulang, dan laporan. Dilengkapi dengan proteksi PIN/Sandi *Hash SHA-256*.
+  - **Siswa / Orang Tua:** Masuk menggunakan NIS dan PIN untuk memantau riwayat pembayaran, sisa tunggakan, serta kehadiran siswa (Read-only).
 - 💰 **Manajemen Pembayaran SPP & Ijazah**
   - **SPP:** Mencatat pembayaran per bulan. Tampilan grid interaktif untuk melihat bulan mana yang sudah/belum lunas.
   - **Ijazah:** Mendukung pembayaran Ijazah dengan sistem *cicilan fleksibel*. Sisa tagihan dihitung otomatis.

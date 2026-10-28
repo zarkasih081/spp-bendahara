@@ -1,8 +1,10 @@
-import { store, saveAuth, hashPassword } from '../state/store.js';
-import { triggerRender } from '../utils/events.js';
-import { escapeHtml, toast } from '../utils/helpers.js';
-import { LOGO_BASE64 } from '../utils/constants.js';
-import { openModal } from '../components/Modal.js';
+import { store } from '../../app/state.js';
+import { saveAuth, hashPassword } from '../../data/authStorage.js';
+import { triggerRender } from '../../utils/events.js';
+import { toast } from '../../utils/helpers.js';
+import { escapeHtml } from '../../utils/formatters.js';
+import { LOGO_BASE64 } from '../../utils/constants.js';
+import { openModal } from '../../components/Modal.js';
 
 export function renderLogin() {
   const loginPage = document.getElementById('page-login');
@@ -23,8 +25,8 @@ export function renderLogin() {
     <div class="login-container">
       <div class="login-left">
         <div class="login-left-pattern"></div>
-        <h1>SPPKu</h1>
-        <p>Aplikasi pencatatan pembayaran SPP dan Ijazah sekolah yang modern, cepat, dan transparan.</p>
+        <h1>EduPass</h1>
+        <p>Portal pintar presensi kartu QR dan administrasi keuangan sekolah yang modern, cepat, dan transparan.</p>
         <div class="login-quote-box">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="quote-icon"><path d="M3 21c3 0 7-1 7-8V5c0-1.25-.756-2.017-2-2H4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2 1 0 1 0 1 1v1c0 1-1 2-2 2s-1 .008-1 1.031V20c0 1 0 1 1 1z"></path><path d="M15 21c3 0 7-1 7-8V5c0-1.25-.757-2.017-2-2h-4c-1.25 0-2 .75-2 1.972V11c0 1.25.75 2 2 2h.75c0 2.25.25 4-2.75 4v3c0 1 0 1 1 1z"></path></svg>
           <p id="login-quote" class="quote-text"></p>
@@ -41,17 +43,26 @@ export function renderLogin() {
           <div class="login-logo" id="secret-trigger" style="background: transparent; box-shadow: none; width: auto; height: auto; cursor: default; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none; outline: none;">
             <img src="${LOGO_BASE64}" alt="Logo Sekolah" draggable="false" style="width: 80px; height: 80px; object-fit: contain; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.15)); margin-bottom: -10px; pointer-events: none; user-select: none; -webkit-user-drag: none; -webkit-touch-callout: none;">
           </div>
+          <div class="login-role-switcher" style="display:flex; background:var(--paper-dim); border:1px solid var(--line); border-radius:12px; padding:4px; margin-bottom:20px; gap:4px;">
+            <button type="button" class="login-role-tab active" id="tab-login-siswa" style="flex:1; border:none; padding:8px 12px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; background:var(--primary); color:#fff; transition:all 0.2s;">
+              Siswa
+            </button>
+            <button type="button" class="login-role-tab" id="tab-login-bendahara" style="flex:1; border:none; padding:8px 12px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; background:transparent; color:var(--ink-soft); transition:all 0.2s;">
+              Bendahara
+            </button>
+          </div>
+
           <h2 id="dynamic-greeting">${greeting}</h2>
-          <p class="subtitle">Silakan masuk untuk melihat rincian pembayaran</p>
+          <p class="subtitle" id="dynamic-subtitle">Silakan masuk untuk melihat presensi dan tagihan SPP</p>
           
           <form id="form-login-bendahara" class="login-form">
             <div class="form-group form-floating">
-              <input type="text" id="login-admin-user" placeholder=" " required>
+              <input type="text" id="login-admin-user" placeholder=" " autocomplete="username" required>
               <label for="login-admin-user">Username Bendahara</label>
             </div>
             <div class="form-group form-floating">
               <div class="password-wrapper">
-                <input type="password" id="login-admin-pass" placeholder=" " required>
+                <input type="password" id="login-admin-pass" placeholder=" " autocomplete="current-password" required>
                 <label for="login-admin-pass">Password Bendahara</label>
                 <button type="button" class="password-toggle" tabindex="-1" title="Tampilkan/Sembunyikan">
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
@@ -59,8 +70,8 @@ export function renderLogin() {
               </div>
             </div>
             
-            <div class="login-options" style="display:flex; justify-content:space-between; align-items:center;">
-              <label><input type="checkbox" id="remember-admin"> Ingat saya</label>
+            <div class="login-options">
+              <label><input type="checkbox" id="remember-admin" checked> Ingat saya di perangkat ini</label>
             </div>
 
             <button type="submit" class="login-btn" id="btn-login-bendahara">
@@ -71,12 +82,12 @@ export function renderLogin() {
 
           <form id="form-login-siswa" class="login-form active">
             <div class="form-group form-floating">
-              <input type="text" id="login-siswa-nis" placeholder=" " required>
+              <input type="text" id="login-siswa-nis" inputmode="numeric" pattern="[0-9]*" autocomplete="username" placeholder=" " required>
               <label for="login-siswa-nis">NIS (Nomor Induk Siswa)</label>
             </div>
             <div class="form-group form-floating">
               <div class="password-wrapper">
-                <input type="password" id="login-siswa-pin" placeholder=" " required>
+                <input type="password" id="login-siswa-pin" inputmode="numeric" autocomplete="current-password" placeholder=" " required>
                 <label for="login-siswa-pin">PIN / Kata Sandi Siswa</label>
                 <button type="button" class="password-toggle" tabindex="-1" title="Tampilkan/Sembunyikan">
                   <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
@@ -84,9 +95,9 @@ export function renderLogin() {
               </div>
             </div>
 
-            <div class="login-options" style="display:flex; justify-content:space-between; align-items:center;">
-              <label><input type="checkbox" id="remember-siswa"> Ingat saya</label>
-              <a href="#" id="lupa-pin" style="color:var(--green); font-size:14px; text-decoration:none;">Lupa PIN?</a>
+            <div class="login-options">
+              <label><input type="checkbox" id="remember-siswa" checked> Ingat saya di perangkat ini</label>
+              <a href="#" id="lupa-pin">Lupa PIN?</a>
             </div>
 
             <button type="submit" class="login-btn" id="btn-login-siswa">
@@ -118,16 +129,17 @@ export function renderLogin() {
 
   // Theme Toggle Logic
   const themeToggle = document.getElementById('theme-toggle');
+  const sunSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>';
+  const moonSvg = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>';
   if (localStorage.getItem('theme') === 'dark') {
     document.body.classList.add('dark-mode');
   }
+  themeToggle.innerHTML = document.body.classList.contains('dark-mode') ? sunSvg : moonSvg;
   themeToggle.addEventListener('click', () => {
     document.body.classList.toggle('dark-mode');
-    if (document.body.classList.contains('dark-mode')) {
-      localStorage.setItem('theme', 'dark');
-    } else {
-      localStorage.setItem('theme', 'light');
-    }
+    const isDark = document.body.classList.contains('dark-mode');
+    localStorage.setItem('theme', isDark ? 'dark' : 'light');
+    themeToggle.innerHTML = isDark ? sunSvg : moonSvg;
   });
 
   // Show/Hide Password Logic
@@ -150,31 +162,62 @@ export function renderLogin() {
     });
   });
 
-  // Secret Door Logic (3 clicks)
+  // Role Switcher Tabs (Siswa / Bendahara)
+  const tabSiswa = document.getElementById('tab-login-siswa');
+  const tabBendahara = document.getElementById('tab-login-bendahara');
+  const bendaharaForm = document.getElementById('form-login-bendahara');
+  const siswaForm = document.getElementById('form-login-siswa');
+  const greetingEl = document.getElementById('dynamic-greeting');
+  const subtitleEl = document.getElementById('dynamic-subtitle');
+
+  const switchRole = (targetRole) => {
+    if (targetRole === 'bendahara') {
+      tabBendahara.classList.add('active');
+      tabBendahara.style.background = 'var(--primary)';
+      tabBendahara.style.color = '#fff';
+      tabSiswa.classList.remove('active');
+      tabSiswa.style.background = 'transparent';
+      tabSiswa.style.color = 'var(--ink-soft)';
+
+      siswaForm.classList.remove('active');
+      bendaharaForm.classList.add('active');
+      greetingEl.textContent = "Masuk Bendahara";
+      subtitleEl.textContent = "Akses modul keuangan, absensi & administrasi sekolah";
+      document.getElementById('login-admin-user').focus();
+    } else {
+      tabSiswa.classList.add('active');
+      tabSiswa.style.background = 'var(--primary)';
+      tabSiswa.style.color = '#fff';
+      tabBendahara.classList.remove('active');
+      tabBendahara.style.background = 'transparent';
+      tabBendahara.style.color = 'var(--ink-soft)';
+
+      bendaharaForm.classList.remove('active');
+      siswaForm.classList.add('active');
+      greetingEl.textContent = greeting;
+      subtitleEl.textContent = "Silakan masuk untuk melihat presensi dan tagihan SPP";
+      document.getElementById('login-siswa-nis').focus();
+    }
+  };
+
+  tabSiswa?.addEventListener('click', () => switchRole('siswa'));
+  tabBendahara?.addEventListener('click', () => switchRole('bendahara'));
+
+  // Secret Door Logic (also triggers switch to bendahara)
   let clickCount = 0;
   let clickTimer;
   const secretTrigger = document.getElementById('secret-trigger');
-  const forms = loginPage.querySelectorAll('.login-form');
   
-  secretTrigger.addEventListener('click', () => {
+  secretTrigger?.addEventListener('click', () => {
     clickCount++;
     clearTimeout(clickTimer);
     
     if (clickCount >= 3) {
       clickCount = 0;
-      const bendaharaForm = document.getElementById('form-login-bendahara');
-      const siswaForm = document.getElementById('form-login-siswa');
-      
       if (bendaharaForm.classList.contains('active')) {
-        bendaharaForm.classList.remove('active');
-        siswaForm.classList.add('active');
-        document.getElementById('dynamic-greeting').textContent = greeting;
-        document.getElementById('login-siswa-nis').focus();
+        switchRole('siswa');
       } else {
-        siswaForm.classList.remove('active');
-        bendaharaForm.classList.add('active');
-        document.getElementById('dynamic-greeting').textContent = "Selamat Datang Bendahara";
-        document.getElementById('login-admin-user').focus();
+        switchRole('bendahara');
         toast('Portal Admin Terbuka', 'success');
       }
     }
@@ -189,7 +232,7 @@ export function renderLogin() {
     const btn = document.getElementById(`btn-login-${role}`);
     const originalContent = btn.innerHTML;
     
-    // Simulate Loading
+    // Simulate Loading (crisp 250ms)
     btn.innerHTML = '<div class="spinner"></div>';
     btn.disabled = true;
 
@@ -203,8 +246,8 @@ export function renderLogin() {
         const remember = document.getElementById('remember-admin').checked;
         const hashedPass = await hashPassword(pass);
         if(user === 'admin' && hashedPass === store.state.settings.adminPassword) {
-          store.ui.currentUser = { role: 'bendahara' };
-          if(remember) saveAuth(store.ui.currentUser);
+          store.ui.currentUser = { role: 'bendahara', nama: 'Bendahara Sekolah' };
+          saveAuth(store.ui.currentUser, remember);
           store.ui.page = 'dashboard';
           triggerRender();
           toast('Login berhasil sebagai Bendahara', 'success');
@@ -214,7 +257,7 @@ export function renderLogin() {
       } else {
         const nis = document.getElementById('login-siswa-nis').value.trim();
         const pin = document.getElementById('login-siswa-pin').value.trim();
-        const pinContainer = document.getElementById('pin-otp-container');
+        const remember = document.getElementById('remember-siswa').checked;
         
         if(!nis) {
           toast('NIS tidak boleh kosong', 'error');
@@ -242,13 +285,12 @@ export function renderLogin() {
         }
 
         const correctPin = siswa.pin || siswa.nis;
-        const remember = document.getElementById('remember-siswa').checked;
         if(pin === correctPin) {
-          store.ui.currentUser = { role: 'siswa', id: siswa.id, nama: siswa.nama };
-          if(remember) saveAuth(store.ui.currentUser);
+          store.ui.currentUser = { role: 'siswa', id: siswa.id, nama: siswa.nama, nis: siswa.nis, kelas: siswa.kelas };
+          saveAuth(store.ui.currentUser, remember);
           store.ui.page = 'dashboard';
           triggerRender();
-          toast('Login berhasil sebagai Siswa', 'success');
+          toast('Selamat datang, ' + siswa.nama, 'success');
         } else {
           toast('PIN salah!', 'error');
           const pinInput = document.getElementById('login-siswa-pin');
@@ -258,7 +300,7 @@ export function renderLogin() {
           }
         }
       }
-    }, 600); // 600ms loading simulation
+    }, 250);
   };
 
   // Removed OTP Logic as it's no longer used

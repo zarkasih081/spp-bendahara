@@ -1,6 +1,6 @@
 import fs from 'fs';
 import path from 'path';
-import { LOGO_BASE64 } from './src/utils/constants.js';
+import { LOGO_BASE64 } from '../src/utils/constants.js';
 
 const publicDir = path.join(process.cwd(), 'public');
 if (!fs.existsSync(publicDir)) {
@@ -17,8 +17,8 @@ fs.writeFileSync(iconPath512, base64Data, 'base64');
 
 // 2. Create manifest.json
 const manifest = {
-  "name": "SPPKu",
-  "short_name": "SPPKu",
+  "name": "EduPass",
+  "short_name": "EduPass",
   "start_url": "./",
   "display": "standalone",
   "background_color": "#f3f4f6",

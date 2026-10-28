@@ -1,8 +1,10 @@
-import { store, saveData } from '../state/store.js';
-import { getPeriodeBerjalan, emptyState, siswaTotalBulan, uid, toast, fmtDate, fmtRupiah, escapeHtml, BULAN, formatWaLink } from '../utils/helpers.js';
-import { triggerRender } from '../utils/events.js';
-import { LOGO_BASE64 } from '../utils/constants.js';
-import { openConfirm, openModal } from '../components/Modal.js';
+import { store } from '../../app/state.js';
+import { getPeriode, emptyState, siswaTotalBulan, toast, BULAN } from '../../utils/helpers.js';
+import { fmtDate, fmtRupiah, escapeHtml } from '../../utils/formatters.js';
+import { triggerRender } from '../../utils/events.js';
+import { openConfirm } from '../../components/Modal.js';
+import { getPembayaranBySiswaId, savePembayaranSPP, savePembayaranIjazah, generateNoKwitansi, cancelPembayaran, getSisaTagihanIjazah } from './pembayaranService.js';
+import { cetakKwitansi } from './kwitansi.js';
 
 export function renderBayar(){
   const el = document.getElementById('page-bayar');
@@ -18,17 +20,18 @@ export function renderBayar(){
     return;
   }
   const sorted = [...store.state.siswa].sort((a,b)=> a.kelas.localeCompare(b.kelas) || a.nama.localeCompare(b.nama));
-  const selectedId = store.ui.bayarSiswaId || sorted[0].id;
+  const existingSiswa = store.state.siswa.find(s => s.id === store.ui.bayarSiswaId);
+  const siswa = existingSiswa || sorted[0];
+  const selectedId = siswa.id;
   store.ui.bayarSiswaId = selectedId;
-  const siswa = store.state.siswa.find(s=>s.id===selectedId);
   
   store.ui.bayarJenis = store.ui.bayarJenis || 'spp';
   const jenis = store.ui.bayarJenis;
-  const periode = getPeriodeBerjalan();
+  const periode = getPeriode();
   const nominalSPP = store.state.settings.nominalSPP;
   const nominalIjazah = store.state.settings.nominalIjazah || 500000;
   
-  const ijazahTerbayar = store.state.pembayaran.filter(p=>p.siswaId===siswa.id && p.jenis==='ijazah').reduce((sum, p)=>sum+p.nominal, 0);
+  const tagihanIjazah = getSisaTagihanIjazah(siswa.id, nominalIjazah);
 
   el.innerHTML = `
     <div class="tabs" style="margin-bottom: 16px;">
@@ -57,9 +60,9 @@ export function renderBayar(){
       ` : `
         <div style="background:var(--paper-dim); padding:12px; border-radius:6px; margin-bottom:14px;">
           <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>Total Tagihan Ijazah:</span> <strong>${fmtRupiah(nominalIjazah)}</strong></div>
-          <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#10B981;"><span>Sudah Terbayar:</span> <strong>${fmtRupiah(ijazahTerbayar)}</strong></div>
+          <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#10B981;"><span>Sudah Terbayar:</span> <strong>${fmtRupiah(tagihanIjazah.terbayar)}</strong></div>
           <div class="divider" style="margin:8px 0;"></div>
-          <div style="display:flex; justify-content:space-between; color:var(--rust); font-weight:600;"><span>Sisa Tagihan:</span> <span>${fmtRupiah(Math.max(0, nominalIjazah - ijazahTerbayar))}</span></div>
+          <div style="display:flex; justify-content:space-between; color:var(--rust); font-weight:600;"><span>Sisa Tagihan:</span> <span>${fmtRupiah(tagihanIjazah.sisa)}</span></div>
         </div>
       `}
 
@@ -72,7 +75,7 @@ export function renderBayar(){
         </div>
         <div class="form-group">
           <label>Tanggal Bayar</label>
-          <input id="bayar-tanggal" type="date" style="width:100%;" value="${new Date().toISOString().slice(0,10)}">
+          <input id="bayar-tanggal" type="date" style="width:100%;" value="${(() => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`; })()}">
         </div>
       </div>
       <div class="form-group">
@@ -148,7 +151,7 @@ function updateNominalHint(nominal){
 }
 
 function renderBayarRiwayat(siswa){
-  const rows = store.state.pembayaran.filter(p=>p.siswaId===siswa.id).sort((a,b)=> new Date(b.tanggal)-new Date(a.tanggal));
+  const rows = getPembayaranBySiswaId(siswa.id);
   const tbody = document.getElementById('bayar-riwayat-tbody');
   if(rows.length===0){ tbody.innerHTML = `<tr class="empty-row"><td colspan="5">Belum ada riwayat pembayaran.</td></tr>`; return; }
   tbody.innerHTML = rows.map(p=>`<tr>
@@ -168,8 +171,7 @@ function renderBayarRiwayat(siswa){
   }));
   tbody.querySelectorAll('[data-del-bayar]').forEach(b=>b.addEventListener('click', ()=>{
     openConfirm('Batalkan transaksi pembayaran ini?', ()=>{
-      store.state.pembayaran = store.state.pembayaran.filter(x=>x.id!==b.dataset.delBayar);
-      saveData('Pembayaran dibatalkan');
+      cancelPembayaran(b.dataset.delBayar);
       renderBayar();
     });
   }));
@@ -201,112 +203,15 @@ function simpanPembayaran(nominalSPP){
     return; 
   }
 
-  store.state.settings.kwitansiCounter = (store.state.settings.kwitansiCounter||0) + 1;
-  const noKwitansi = 'KW-' + new Date(tanggal).getFullYear() + '-' + String(store.state.settings.kwitansiCounter).padStart(4,'0');
+  const noKwitansi = generateNoKwitansi(tanggal);
 
   if(jenis === 'spp'){
-    const per = Math.floor(nominal / months.length);
-    const remainder = nominal - per*months.length;
-    months.forEach((m,i)=>{
-      store.state.pembayaran.push({
-        id: uid(), siswaId: siswa.id, jenis: 'spp', bulan: m.bulan, tahun: m.tahun,
-        tanggal, nominal: per + (i===0?remainder:0), keterangan: ket, noKwitansi
-      });
-    });
+    savePembayaranSPP(siswa.id, nominal, tanggal, ket, months, noKwitansi);
   } else {
-    store.state.pembayaran.push({
-      id: uid(), siswaId: siswa.id, jenis: 'ijazah', bulan: null, tahun: null,
-      tanggal, nominal, keterangan: ket, noKwitansi
-    });
+    savePembayaranIjazah(siswa.id, nominal, tanggal, ket, noKwitansi);
   }
 
-  saveData('Pembayaran tersimpan');
   store.ui.bayarSelectedMonths = [];
   cetakKwitansi(siswa, months, nominal, noKwitansi, tanggal, jenis);
   renderBayar();
-}
-
-function cetakKwitansi(siswa, months, nominal, noKwitansi, tanggal, jenis){
-  const s = store.state.settings;
-  const itemText = jenis==='spp' ? 'SPP Bulan ' + months.map(m=>`${BULAN[m.bulan-1]} ${m.tahun}`).join(', ') : 'Pembayaran Ijazah';
-  
-  const area = document.getElementById('kwitansi-print-area');
-  area.innerHTML = `
-    <div class="receipt">
-      <div class="receipt-head">
-        <img src="${LOGO_BASE64}" class="seal" alt="Logo">
-        <div class="sekolah">${escapeHtml(s.namaSekolah)}</div>
-        <div class="ta">Tahun Ajaran ${escapeHtml(s.tahunAjaran)}</div>
-      </div>
-      <div class="receipt-title">${jenis==='spp' ? 'KUITANSI PEMBAYARAN SPP' : 'KUITANSI PEMBAYARAN IJAZAH'}</div>
-      <div class="receipt-row"><span class="k">No. Kuitansi</span><span class="v">${noKwitansi}</span></div>
-      <div class="receipt-row"><span class="k">Tanggal</span><span class="v">${fmtDate(tanggal)}</span></div>
-      <div class="receipt-row"><span class="k">Nama Siswa</span><span class="v">${escapeHtml(siswa.nama)}</span></div>
-      <div class="receipt-row"><span class="k">Kelas</span><span class="v">${escapeHtml(siswa.kelas)}</span></div>
-      <div class="receipt-row"><span class="k">NIS</span><span class="v">${escapeHtml(siswa.nis||'-')}</span></div>
-      <div class="receipt-row"><span class="k">Pembayaran</span><span class="v">${itemText}</span></div>
-      <div class="receipt-amt">
-        <div class="lbl">Jumlah Dibayar</div>
-        <div class="amt">${fmtRupiah(nominal)}</div>
-      </div>
-      <div class="receipt-sign">
-        <div>Diterima oleh,</div>
-        <div class="line">${escapeHtml(s.bendahara || 'Bendahara Sekolah')}</div>
-      </div>
-      <div class="receipt-foot">Kuitansi digital ini merupakan bukti pembayaran yang sah untuk keperluan arsip.</div>
-    </div>
-  `;
-  openKwitansiModal(noKwitansi, siswa, itemText, nominal, tanggal, jenis);
-}
-
-function openKwitansiModal(noKwitansi, siswa, itemText, nominal, tanggal, jenis){
-  const hasWa = !!siswa.noHp;
-  openModal(`
-    <div class="modal-head"><h3>Kuitansi ${noKwitansi}</h3><button class="close-x" id="modal-close">&times;</button></div>
-    <div class="modal-body" id="kwitansi-preview-slot" style="background:var(--paper-dim); padding:24px 8px;"></div>
-    <div class="modal-foot" style="flex-wrap:wrap;">
-      <button class="btn" id="modal-cancel">Tutup</button>
-      <div style="flex:1"></div>
-      ${hasWa ? `<button class="btn" id="btn-wa-kwitansi" style="background:#25D366; color:white; border-color:#25D366;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Kirim via WA</button>` : ''}
-      <button class="btn btn-primary" id="btn-cetak-kwitansi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9V3h12v6M6 18h12v4H6v-4zM4 9h16v7H4z"/></svg> Cetak / PDF</button>
-    </div>
-    <div style="padding:0 20px 14px; text-align:right; font-size:11.5px; color:var(--ink-soft);">Tips: Pastikan setelan Margin adalah "None" saat mencetak.</div>
-  `, 'wide');
-  document.getElementById('kwitansi-preview-slot').innerHTML = document.getElementById('kwitansi-print-area').innerHTML;
-  document.getElementById('btn-cetak-kwitansi').addEventListener('click', ()=>{ window.print(); });
-  
-  if(hasWa){
-    document.getElementById('btn-wa-kwitansi').addEventListener('click', ()=>{
-      const teks = `*KUITANSI PEMBAYARAN ${jenis==='spp'?'SPP':'IJAZAH'}*
-*${store.state.settings.namaSekolah.toUpperCase()}*
-------------------------------------------------------
-
-Kepada Yth. Bapak/Ibu Wali Murid dari *${siswa.nama}*,
-
-Dengan hormat,
-Melalui pesan ini kami menginformasikan bahwa kami telah menerima pembayaran ${jenis==='spp'?'SPP':'Ijazah'} dengan rincian sebagai berikut:
-
-📋 *Data Siswa*
-Nama  : ${siswa.nama}
-Kelas : ${siswa.kelas}
-NIS   : ${siswa.nis || '-'}
-
-📝 *Rincian Pembayaran*
-No. Kuitansi : ${noKwitansi}
-Tanggal      : ${fmtDate(tanggal)}
-Pembayaran   : ${itemText}
-Total Bayar  : *${fmtRupiah(nominal)}*
-
-------------------------------------------------------
-Kuitansi digital ini diterbitkan secara otomatis oleh sistem dan merupakan bukti pembayaran yang sah. Mohon simpan pesan ini sebagai referensi.
-
-Atas perhatian dan kerja sama Bapak/Ibu, kami ucapkan terima kasih.
-
-Hormat kami,
-*Bendahara ${store.state.settings.namaSekolah}*`;
-      
-      const url = formatWaLink(siswa.noHp, teks);
-      window.open(url, '_blank');
-    });
-  }
 }

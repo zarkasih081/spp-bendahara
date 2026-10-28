@@ -1,5 +1,6 @@
-import { store } from '../state/store.js';
+import { store } from '../app/state.js';
 import { triggerRender } from './events.js';
+import { escapeHtml } from './formatters.js';
 
 export const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
 
@@ -50,23 +51,14 @@ export function toast(msg, variant = 'success'){
   }, 2800);
 }
 
-export function fmtRupiah(n){
-  n = Math.round(n||0);
-  return 'Rp' + n.toLocaleString('id-ID');
-}
-export function fmtDate(iso){
-  if(!iso) return '-';
-  const d = new Date(iso);
-  return d.toLocaleDateString('id-ID',{day:'2-digit',month:'short',year:'numeric'});
-}
 
 export function getActiveTahunMulai(){
-  return store.ui.activeTahunMulai || store.state.settings.tahunMulai;
+  return store.ui?.activeTahunMulai || store.state?.settings?.tahunMulai || new Date().getFullYear();
 }
 export function getPeriode(){
-  const s = store.state.settings;
+  const s = store.state?.settings || {};
   const arr = [];
-  let b = s.bulanMulai, t = getActiveTahunMulai();
+  let b = s.bulanMulai || 7, t = getActiveTahunMulai();
   for(let i=0;i<12;i++){
     arr.push({bulan:b, tahun:t});
     b++; if(b>12){ b=1; t++; }
@@ -80,7 +72,7 @@ export function getPeriodeBerjalan(){
 }
 export function siswaTotalBulan(siswaId, bulan, tahun){
   return store.state.pembayaran
-    .filter(p => p.siswaId === siswaId && p.bulan === bulan && p.tahun === tahun)
+    .filter(p => p.siswaId === siswaId && (!p.jenis || p.jenis === 'spp') && p.bulan === bulan && p.tahun === tahun)
     .reduce((a,p)=>a+p.nominal, 0);
 }
 export function siswaStatusBulan(siswaId, bulan, tahun){
@@ -109,10 +101,6 @@ export function currentPeriodeEntry(){
   return { bulan: now.getMonth()+1, tahun: now.getFullYear() };
 }
 
-export function escapeHtml(str){
-  return String(str||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-export function escapeAttr(str){ return escapeHtml(str); }
 
 export function downloadFile(filename, content, mimeType = 'text/csv;charset=utf-8;'){
   const blob = new Blob([content], {type: mimeType});
@@ -136,11 +124,4 @@ export function emptyState(iconSvg, title, desc, btnLabel, onClick){
   </div>`;
 }
 
-export function formatWaLink(noHp, text){
-  if(!noHp) return null;
-  let hp = String(noHp).replace(/[^0-9]/g, '');
-  if(hp.startsWith('0')){
-    hp = '62' + hp.substring(1);
-  }
-  return `https://wa.me/${hp}?text=${encodeURIComponent(text)}`;
-}
+

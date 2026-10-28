@@ -86,11 +86,11 @@ export async function setCloudData(key, jsonString) {
 }
 ```
 
-### 3. Modifikasi File `src/main.js`
-Buka file `src/main.js`, lalu tambahkan baris kode ini di bagian **paling atas**:
+### 3. Modifikasi File `src/app/main.js`
+Buka file `src/app/main.js`, lalu tambahkan baris kode ini di bagian **paling atas**:
 
 ```javascript
-import { getCloudData, setCloudData } from './utils/firebase.js';
+import { getCloudData, setCloudData } from '../utils/firebase.js';
 
 // Mengubah mekanisme penyimpanan dari LocalStorage menjadi Cloud Firebase
 window.storage = {
