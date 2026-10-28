@@ -1,11 +1,12 @@
 import { store } from '../../app/state.js';
 import { saveData } from '../../data/database.js';
-import { escapeHtml, escapeAttr } from '../../utils/formatters.js';
+import { escapeHtml, escapeAttr, formatWaLink } from '../../utils/formatters.js';
 import { toast, BULAN } from '../../utils/helpers.js';
 import { openModal, closeModal, openConfirm } from '../../components/Modal.js';
 import { triggerRender } from '../../utils/events.js';
 import {
   getTodayDateStr,
+  parseLocalDate,
   getCurrentTimeStr,
   formatTimeDisplay,
   catatAbsenByKode,
@@ -17,7 +18,7 @@ import {
   formatWaLinkAbsensi,
   playScanSound
 } from './absensiService.js';
-import { renderStudentCardHtml, generateQrDataUrl } from './qrCardGenerator.js';
+import { renderStudentCardHtml, generateQrDataUrl, downloadStudentQrCardPng } from './qrCardGenerator.js';
 import { Html5Qrcode } from 'html5-qrcode';
 
 let activeHtml5QrCode = null;
@@ -246,8 +247,15 @@ async function renderSiswaAbsensiView(el, user) {
   const todayRecord = (store.state.absensi || []).find(a => a.siswaId === siswa.id && a.tanggal === today);
 
   const now = new Date();
-  const currentBulan = now.getMonth() + 1;
-  const currentTahun = now.getFullYear();
+  if (!store.ui.siswaAbsenBulan) store.ui.siswaAbsenBulan = now.getMonth() + 1;
+  if (!store.ui.siswaAbsenTahun) store.ui.siswaAbsenTahun = now.getFullYear();
+  const currentBulan = store.ui.siswaAbsenBulan;
+  const currentTahun = store.ui.siswaAbsenTahun;
+
+  const allStudentYears = (store.state.absensi || [])
+    .filter(a => a.siswaId === siswa.id && a.tanggal)
+    .map(a => parseLocalDate(a.tanggal).getFullYear());
+  const tahunOptions = [...new Set([now.getFullYear() - 1, now.getFullYear(), now.getFullYear() + 1, ...allStudentYears])].sort((a, b) => a - b);
 
   const riwayat = getRiwayatAbsensiSiswa(siswa.id, currentBulan, currentTahun);
   const totalHadir = riwayat.filter(r => r.status === 'hadir').length;
@@ -294,8 +302,14 @@ async function renderSiswaAbsensiView(el, user) {
           <h2 style="margin:2px 0 6px 0; font-size:18px;">${new Date().toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</h2>
           <div style="font-size:13.5px; color:var(--ink-soft);">${statusDescToday}</div>
         </div>
-        <div>
+        <div style="display:flex; flex-direction:column; align-items:flex-end; gap:8px;">
           ${statusBadgeToday}
+          ${!todayRecord ? `
+            <button type="button" class="btn btn-sm btn-outline" id="btn-siswa-ajukan-izin" title="Kirim Permohonan Izin / Sakit via WhatsApp ke Sekolah">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+              <span>Ajukan Izin / Sakit</span>
+            </button>
+          ` : ''}
         </div>
       </div>
     </div>
@@ -314,7 +328,7 @@ async function renderSiswaAbsensiView(el, user) {
           </button>
           <button class="btn btn-primary" id="btn-download-kartu">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg>
-            Simpan QR
+            Simpan Kartu QR
           </button>
           <button class="btn" id="btn-print-kartu">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
@@ -328,15 +342,36 @@ async function renderSiswaAbsensiView(el, user) {
       </div>
     </div>
 
-    <!-- Ringkasan Statistik Bulan Ini -->
+    <!-- Filter Periode Bulan & Tahun Absensi Siswa -->
+    <div class="toolbar" style="margin-bottom:14px;">
+      <div class="toolbar-left" style="align-items:center;">
+        <span style="font-size:13px; font-weight:600; color:var(--ink);">Periode Kehadiran:</span>
+        <select id="siswa-absen-bulan">
+          ${BULAN.map((b, i) => `<option value="${i + 1}" ${currentBulan === i + 1 ? 'selected' : ''}>${b}</option>`).join('')}
+        </select>
+        <select id="siswa-absen-tahun">
+          ${tahunOptions.map(y => `<option value="${y}" ${currentTahun === y ? 'selected' : ''}>${y}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+
+    <!-- Ringkasan Statistik Bulan Terpilih (4 Kartu Seimbang) -->
     <div class="stat-row" style="margin-bottom:18px;">
       <div class="stat-card gold">
         <div class="stat-icon">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>
         </div>
-        <div class="label">Total Hadir (${BULAN[currentBulan-1]})</div>
-        <div class="value">${totalMasuk} Hari</div>
-        <div class="foot">${totalHadir} tepat waktu • ${totalTerlambat} terlambat</div>
+        <div class="label">Hadir Tepat Waktu</div>
+        <div class="value">${totalHadir} Hari</div>
+        <div class="foot">Total masuk: ${totalMasuk} hari (${BULAN[currentBulan-1]})</div>
+      </div>
+      <div class="stat-card amber">
+        <div class="stat-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+        </div>
+        <div class="label">Terlambat Masuk</div>
+        <div class="value">${totalTerlambat} Hari</div>
+        <div class="foot">Melewati batas jam masuk</div>
       </div>
       <div class="stat-card blue">
         <div class="stat-icon">
@@ -344,7 +379,15 @@ async function renderSiswaAbsensiView(el, user) {
         </div>
         <div class="label">Izin / Sakit</div>
         <div class="value">${totalIzin + totalSakit} Hari</div>
-        <div class="foot">${totalIzin} izin • ${totalSakit} sakit • ${totalAlpa} alpa</div>
+        <div class="foot">${totalIzin} izin • ${totalSakit} sakit</div>
+      </div>
+      <div class="stat-card ${totalAlpa > 0 ? 'rust' : 'emerald'}">
+        <div class="stat-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+        </div>
+        <div class="label">Alpa (Tanpa Ket.)</div>
+        <div class="value">${totalAlpa} Hari</div>
+        <div class="foot">${totalAlpa === 0 ? 'Kehadiran sangat baik' : 'Perlu perhatian'}</div>
       </div>
     </div>
 
@@ -391,7 +434,7 @@ async function renderSiswaAbsensiView(el, user) {
 
               return `
                 <tr>
-                  <td>${new Date(r.tanggal).toLocaleDateString('id-ID', { weekday:'short', day:'numeric', month:'short', year:'numeric' })}</td>
+                  <td>${parseLocalDate(r.tanggal).toLocaleDateString('id-ID', { weekday:'short', day:'numeric', month:'short', year:'numeric' })}</td>
                   <td class="monospace">${formatTimeDisplay(r.jamMasuk)}</td>
                   <td class="monospace">${formatTimeDisplay(r.jamPulang)}</td>
                   <td>${badge}</td>
@@ -412,6 +455,15 @@ async function renderSiswaAbsensiView(el, user) {
   `;
 
   // Attach button events for Siswa
+  document.getElementById('siswa-absen-bulan')?.addEventListener('change', e => {
+    store.ui.siswaAbsenBulan = +e.target.value;
+    renderAbsensi();
+  });
+  document.getElementById('siswa-absen-tahun')?.addEventListener('change', e => {
+    store.ui.siswaAbsenTahun = +e.target.value;
+    renderAbsensi();
+  });
+
   document.getElementById('btn-print-kartu')?.addEventListener('click', () => {
     printSingleCard(siswa);
   });
@@ -442,12 +494,25 @@ async function renderSiswaAbsensiView(el, user) {
   });
 
   document.getElementById('btn-download-kartu')?.addEventListener('click', async () => {
-    const qrUrl = await generateQrDataUrl(siswa.nis || siswa.id);
-    const a = document.createElement('a');
-    a.href = qrUrl;
-    a.download = `QR_Absen_${siswa.nama.replace(/\s+/g, '_')}_${siswa.nis || ''}.png`;
-    a.click();
-    toast('QR Code berhasil didownload', 'success');
+    await downloadStudentQrCardPng(siswa);
+    toast('Kartu QR berhasil disimpan sebagai gambar PNG', 'success');
+  });
+
+  document.getElementById('btn-siswa-ajukan-izin')?.addEventListener('click', () => {
+    const noHpSekolah = store.state.settings.noHpBendahara;
+    if (!noHpSekolah) {
+      toast('Nomor WhatsApp sekolah/bendahara belum diatur oleh admin.', 'info');
+      return;
+    }
+    const tglHariIni = new Date().toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+    const teks = `Assalamu'alaikum Wr. Wb.\nYth. Bapak/Ibu Petugas Presensi ${store.state.settings.namaSekolah},\n\nKami memberitahukan bahwa siswa:\nNama : *${siswa.nama}*\nKelas : *${siswa.kelas}*\nNIS : *${siswa.nis || '-'}*\n\nMemohon izin tidak dapat hadir mengikuti kegiatan sekolah pada hari ini (*${tglHariIni}*) dikarenakan *Izin / Sakit* (Ket: ...).\n\nDemikian permohonan ini kami sampaikan. Terima kasih.`;
+    window.open(formatWaLink(noHpSekolah, teks), '_blank');
+  });
+
+  el.querySelectorAll('[data-cal-info]').forEach(dayEl => {
+    dayEl.addEventListener('click', () => {
+      toast(dayEl.dataset.calInfo, 'info');
+    });
   });
 
   // Mobile Floating QR Modal Trigger
@@ -489,14 +554,15 @@ function generateAttendanceCalendarHtml(year, month, riwayat) {
     let dayStatusTooltip = '';
 
     if (rec) {
-      if (rec.status === 'hadir') { dotClass = 'dot-hadir'; dayStatusTooltip = `Hadir: ${formatTimeDisplay(rec.jamMasuk)}`; }
-      else if (rec.status === 'terlambat') { dotClass = 'dot-terlambat'; dayStatusTooltip = `Terlambat: ${formatTimeDisplay(rec.jamMasuk)}`; }
-      else if (rec.status === 'izin' || rec.status === 'sakit') { dotClass = 'dot-izin'; dayStatusTooltip = rec.status.toUpperCase(); }
-      else if (rec.status === 'alpa') { dotClass = 'dot-alpa'; dayStatusTooltip = 'Alpa'; }
+      const pulangInfo = rec.jamPulang ? ` • Pulang ${formatTimeDisplay(rec.jamPulang)}` : '';
+      if (rec.status === 'hadir') { dotClass = 'dot-hadir'; dayStatusTooltip = `Hadir Tepat Waktu: Masuk ${formatTimeDisplay(rec.jamMasuk)}${pulangInfo}`; }
+      else if (rec.status === 'terlambat') { dotClass = 'dot-terlambat'; dayStatusTooltip = `Terlambat: Masuk ${formatTimeDisplay(rec.jamMasuk)}${pulangInfo}`; }
+      else if (rec.status === 'izin' || rec.status === 'sakit') { dotClass = 'dot-izin'; dayStatusTooltip = `${rec.status.toUpperCase()}${rec.keterangan ? ` (${rec.keterangan})` : ''}`; }
+      else if (rec.status === 'alpa') { dotClass = 'dot-alpa'; dayStatusTooltip = 'Alpa (Tanpa Keterangan)'; }
     }
 
     cells.push(`
-      <div class="cal-day ${isToday ? 'today' : ''} ${dotClass ? 'has-record' : ''}" title="${day} ${BULAN[month-1]}: ${dayStatusTooltip || 'Tidak ada jadwal'}">
+      <div class="cal-day ${isToday ? 'today' : ''} ${dotClass ? 'has-record' : ''}" ${dotClass ? `style="cursor:pointer;" data-cal-info="${escapeAttr(`${day} ${BULAN[month-1]} ${year} — ${dayStatusTooltip}`)}"` : ''} title="${day} ${BULAN[month-1]}: ${dayStatusTooltip || 'Tidak ada catatan'}">
         <span class="day-number">${day}</span>
         ${dotClass ? `<span class="cal-dot ${dotClass}"></span>` : ''}
       </div>
@@ -633,19 +699,19 @@ async function renderScanTab(container) {
       </div>
       <div class="kiosk-counters">
         <div class="k-stat gold" title="Siswa Masuk Tepat Waktu">
-          <span class="k-val">${stats.hadir}</span>
+          <span class="k-val" id="kiosk-stat-hadir">${stats.hadir}</span>
           <span class="k-lbl">✓ Tepat Waktu</span>
         </div>
         <div class="k-stat warning" title="Siswa Masuk Terlambat">
-          <span class="k-val">${stats.terlambat}</span>
+          <span class="k-val" id="kiosk-stat-terlambat">${stats.terlambat}</span>
           <span class="k-lbl">! Terlambat</span>
         </div>
         <div class="k-stat blue" title="Siswa Izin / Sakit Hari Ini">
-          <span class="k-val">${stats.izin + stats.sakit}</span>
+          <span class="k-val" id="kiosk-stat-izin">${stats.izin + stats.sakit}</span>
           <span class="k-lbl">Izin / Sakit</span>
         </div>
         <div class="k-stat gray" title="Siswa Belum Melakukan Absensi">
-          <span class="k-val">${stats.belumHadir}</span>
+          <span class="k-val" id="kiosk-stat-belum">${stats.belumHadir}</span>
           <span class="k-lbl">Belum Hadir</span>
         </div>
       </div>
@@ -905,7 +971,7 @@ async function renderScanTab(container) {
               <h3 style="margin:0; font-size:15px;">Aktivitas Terkini (Hari Ini)</h3>
               <span class="live-pulse-badge">Live</span>
             </div>
-            <span style="font-size:12px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace;">${todayScans.length} siswa terakhir</span>
+            <span id="live-feed-count" style="font-size:12px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace;">${todayScans.length} siswa terakhir</span>
           </div>
 
           <div class="table-scroll">
@@ -920,45 +986,7 @@ async function renderScanTab(container) {
                 </tr>
               </thead>
               <tbody id="live-feed-tbody">
-                ${todayScans.length === 0 ? `
-                  <tr><td colspan="5" style="text-align:center; padding:24px; color:var(--ink-soft);">Belum ada siswa yang absen hari ini.</td></tr>
-                ` : todayScans.map(s => {
-                  const siswa = store.state.siswa.find(x => x.id === s.siswaId);
-                  const nama = siswa ? escapeHtml(siswa.nama) : 'Siswa Terhapus';
-                  const initials = nama.substring(0, 2).toUpperCase();
-                  const kelas = siswa ? escapeHtml(siswa.kelas) : '-';
-                  let statusHtml = '';
-                  if (s.status === 'hadir') statusHtml = '<span class="badge lunas">Tepat Waktu</span>';
-                  else if (s.status === 'terlambat') statusHtml = '<span class="badge parsial">Terlambat</span>';
-                  else if (s.status === 'izin') statusHtml = '<span class="badge" style="background:var(--blue-soft);color:var(--blue);">Izin</span>';
-                  else if (s.status === 'sakit') statusHtml = '<span class="badge" style="background:var(--gold-soft);color:var(--gold);">Sakit</span>';
-                  else statusHtml = '<span class="badge nunggak">Alpa</span>';
-
-                  const waktu = s.jamPulang ? `Pulang ${formatTimeDisplay(s.jamPulang)}` : `Masuk ${formatTimeDisplay(s.jamMasuk)}`;
-                  const waUrl = siswa ? formatWaLinkAbsensi(siswa, s) : null;
-
-                  return `
-                    <tr>
-                      <td class="monospace" style="color:var(--ink-soft); font-size:12px;">${waktu}</td>
-                      <td>
-                        <div style="display:flex; align-items:center; gap:8px;">
-                          <span class="mini-avatar">${initials}</span>
-                          <strong>${nama}</strong>
-                        </div>
-                      </td>
-                      <td><span class="kelas-chip">${kelas}</span></td>
-                      <td>${statusHtml}</td>
-                      <td style="text-align:center;">
-                        ${waUrl ? `
-                          <a href="${waUrl}" target="_blank" class="btn btn-sm btn-wa-notify" title="Kirim Konfirmasi WA ke Orang Tua">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-                            <span>WA</span>
-                          </a>
-                        ` : '<span style="color:var(--line);">-</span>'}
-                      </td>
-                    </tr>
-                  `;
-                }).join('')}
+                ${renderLiveFeedRows(todayScans)}
               </tbody>
             </table>
           </div>
@@ -1483,24 +1511,15 @@ function onQrDetected(code) {
   updateLiveFeedTbody();
 }
 
-function updateLiveFeedTbody() {
-  const tbody = document.getElementById('live-feed-tbody');
-  if (!tbody) return;
-
-  const today = getTodayDateStr();
-  const todayScans = (store.state.absensi || [])
-    .filter(a => a.tanggal === today)
-    .sort((a, b) => (b.waktuScanPulang || b.waktuScanMasuk || 0) - (a.waktuScanPulang || a.waktuScanMasuk || 0))
-    .slice(0, 10);
-
+function renderLiveFeedRows(todayScans) {
   if (todayScans.length === 0) {
-    tbody.innerHTML = `<tr><td colspan="5" style="text-align:center; padding:18px; color:var(--ink-soft);">Belum ada siswa yang absen hari ini.</td></tr>`;
-    return;
+    return `<tr><td colspan="5" style="text-align:center; padding:24px; color:var(--ink-soft);">Belum ada siswa yang absen hari ini.</td></tr>`;
   }
 
-  tbody.innerHTML = todayScans.map(s => {
+  return todayScans.map(s => {
     const siswa = store.state.siswa.find(x => x.id === s.siswaId);
     const nama = siswa ? escapeHtml(siswa.nama) : 'Siswa Terhapus';
+    const initials = nama.substring(0, 2).toUpperCase();
     const kelas = siswa ? escapeHtml(siswa.kelas) : '-';
     let statusHtml = '';
     if (s.status === 'hadir') statusHtml = '<span class="badge lunas">Tepat Waktu</span>';
@@ -1514,15 +1533,20 @@ function updateLiveFeedTbody() {
 
     return `
       <tr>
-        <td class="monospace" style="color:var(--ink-soft);">${waktu}</td>
-        <td><strong>${nama}</strong></td>
+        <td class="monospace" style="color:var(--ink-soft); font-size:12px;">${waktu}</td>
+        <td>
+          <div style="display:flex; align-items:center; gap:8px;">
+            <span class="mini-avatar">${initials}</span>
+            <strong>${nama}</strong>
+          </div>
+        </td>
         <td><span class="kelas-chip">${kelas}</span></td>
         <td>${statusHtml}</td>
         <td style="text-align:center;">
           ${waUrl ? `
-            <a href="${waUrl}" target="_blank" class="btn btn-sm" style="background:#25D366; color:#fff; padding:3px 8px; border:none; display:inline-flex; align-items:center; gap:4px; font-size:11px;" title="Kirim WA ke Orang Tua">
+            <a href="${waUrl}" target="_blank" class="btn btn-sm btn-wa-notify" title="Kirim Konfirmasi WA ke Orang Tua">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-              WA
+              <span>WA</span>
             </a>
           ` : '<span style="color:var(--line);">-</span>'}
         </td>
@@ -1531,17 +1555,51 @@ function updateLiveFeedTbody() {
   }).join('');
 }
 
+function updateLiveFeedTbody() {
+  const today = getTodayDateStr();
+  const statsNow = getStatistikAbsensi(today);
+
+  // Sync main kiosk header counters
+  const kHadir = document.getElementById('kiosk-stat-hadir');
+  const kTerlambat = document.getElementById('kiosk-stat-terlambat');
+  const kIzin = document.getElementById('kiosk-stat-izin');
+  const kBelum = document.getElementById('kiosk-stat-belum');
+  if (kHadir) kHadir.textContent = statsNow.hadir;
+  if (kTerlambat) kTerlambat.textContent = statsNow.terlambat;
+  if (kIzin) kIzin.textContent = statsNow.izin + statsNow.sakit;
+  if (kBelum) kBelum.textContent = statsNow.belumHadir;
+
+  const tbody = document.getElementById('live-feed-tbody');
+  if (!tbody) return;
+
+  const todayScans = (store.state.absensi || [])
+    .filter(a => a.tanggal === today)
+    .sort((a, b) => (b.waktuScanPulang || b.waktuScanMasuk || 0) - (a.waktuScanPulang || a.waktuScanMasuk || 0))
+    .slice(0, 10);
+
+  const countEl = document.getElementById('live-feed-count');
+  if (countEl) countEl.textContent = `${todayScans.length} siswa terakhir`;
+
+  tbody.innerHTML = renderLiveFeedRows(todayScans);
+}
+
 // ------------------------------------------
 // TAB 2: REKAPITULASI & RIWAYAT
 // ------------------------------------------
 function renderRekapTab(container, selectedDate, kelasList) {
+  const wasSearchFocused = document.activeElement?.id === 'rekap-search';
+  const selStart = wasSearchFocused ? document.activeElement.selectionStart : null;
+  const selEnd = wasSearchFocused ? document.activeElement.selectionEnd : null;
+
   const kelasFilter = store.ui.absensiKelasFilter || '';
   const statusFilter = store.ui.absensiStatusFilter || '';
+  const rekapSearch = store.ui.absensiSearch || '';
   const stats = getStatistikAbsensi(selectedDate, kelasFilter);
 
   // Filter students
   const filteredStudents = store.state.siswa.filter(s => {
     if (kelasFilter && s.kelas !== kelasFilter) return false;
+    if (rekapSearch && !s.nama.toLowerCase().includes(rekapSearch.toLowerCase()) && !(s.nis || '').includes(rekapSearch)) return false;
     const rec = stats.records.find(r => r.siswaId === s.id);
     const currentStatus = rec ? rec.status : 'belum';
     if (statusFilter && currentStatus !== statusFilter) return false;
@@ -1552,6 +1610,7 @@ function renderRekapTab(container, selectedDate, kelasList) {
     <!-- Filter Toolbar -->
     <div class="toolbar" style="margin-bottom:16px;">
       <div class="toolbar-left" style="flex-wrap:wrap; gap:10px;">
+        <input class="search-input" id="rekap-search" placeholder="Cari nama / NIS siswa..." value="${escapeAttr(rekapSearch)}">
         <div style="display:flex; align-items:center; gap:6px;">
           <label style="font-weight:600; font-size:13px; color:var(--ink);">Tanggal:</label>
           <input type="date" id="rekap-date-picker" value="${selectedDate}" style="font-size:13px; padding:6px 10px; background:var(--paper);">
@@ -1686,6 +1745,16 @@ function renderRekapTab(container, selectedDate, kelasList) {
   `;
 
   // Filter events
+  const rekapSearchEl = document.getElementById('rekap-search');
+  rekapSearchEl?.addEventListener('input', e => {
+    store.ui.absensiSearch = e.target.value;
+    renderRekapTab(container, selectedDate, kelasList);
+  });
+  if (wasSearchFocused && rekapSearchEl) {
+    rekapSearchEl.focus();
+    if (selStart !== null) rekapSearchEl.setSelectionRange(selStart, selEnd);
+  }
+
   document.getElementById('rekap-date-picker')?.addEventListener('change', e => {
     store.ui.absensiTanggal = e.target.value;
     renderAbsensi();
@@ -1824,12 +1893,8 @@ async function renderKartuTab(container, kelasList) {
     btn.addEventListener('click', async () => {
       const siswa = store.state.siswa.find(s => s.id === btn.dataset.dlQr);
       if (siswa) {
-        const qrUrl = await generateQrDataUrl(siswa.nis || siswa.id);
-        const a = document.createElement('a');
-        a.href = qrUrl;
-        a.download = `QR_${siswa.nama.replace(/\s+/g, '_')}_${siswa.nis || ''}.png`;
-        a.click();
-        toast('QR Code siswa didownload', 'success');
+        await downloadStudentQrCardPng(siswa);
+        toast('Kartu QR siswa berhasil didownload', 'success');
       }
     });
   });
@@ -1840,27 +1905,27 @@ async function renderKartuTab(container, kelasList) {
 // ==========================================
 function openManualAbsensiModal(siswaId = null, defaultDate = null) {
   const tanggal = defaultDate || getTodayDateStr();
-  const siswa = siswaId ? store.state.siswa.find(s => s.id === siswaId) : null;
-  const existingRecord = siswa ? (store.state.absensi || []).find(a => a.siswaId === siswa.id && a.tanggal === tanggal) : null;
+  const siswaList = store.state.siswa.slice().sort((a, b) => a.kelas.localeCompare(b.kelas) || a.nama.localeCompare(b.nama));
+  const initialSiswa = siswaId ? store.state.siswa.find(s => s.id === siswaId) : siswaList[0];
+  const existingRecord = initialSiswa ? (store.state.absensi || []).find(a => a.siswaId === initialSiswa.id && a.tanggal === tanggal) : null;
 
   const currentStatus = existingRecord ? existingRecord.status : 'hadir';
-  const jamMsk = existingRecord ? (existingRecord.jamMasuk || '') : getCurrentTimeStr();
+  const isAbsentStatus = currentStatus === 'izin' || currentStatus === 'sakit' || currentStatus === 'alpa';
+  const jamMsk = existingRecord ? (existingRecord.jamMasuk || '') : (isAbsentStatus ? '' : getCurrentTimeStr());
   const jamPlg = existingRecord ? (existingRecord.jamPulang || '') : '';
   const ket = existingRecord ? (existingRecord.keterangan || '') : '';
 
-  const siswaList = store.state.siswa.slice().sort((a, b) => a.kelas.localeCompare(b.kelas) || a.nama.localeCompare(b.nama));
-
   const html = `
     <div class="modal-head">
-      <h3>${existingRecord ? 'Ubah Status Absensi' : 'Catat Absensi Manual / Izin'}</h3>
+      <h3 id="modal-absen-title">${existingRecord ? 'Ubah Status Absensi' : 'Catat Absensi Manual / Izin'}</h3>
       <button class="close-x" id="modal-close">&times;</button>
     </div>
     <div class="modal-body">
       <div class="form-group">
         <label>Pilih Siswa</label>
-        <select id="modal-absen-siswa" style="width:100%;" ${siswa ? 'disabled' : ''}>
+        <select id="modal-absen-siswa" style="width:100%;" ${siswaId ? 'disabled' : ''}>
           ${siswaList.map(s => `
-            <option value="${s.id}" ${(siswa && siswa.id === s.id) ? 'selected' : ''}>
+            <option value="${s.id}" ${(initialSiswa && initialSiswa.id === s.id) ? 'selected' : ''}>
               ${escapeHtml(s.nama)} (${escapeHtml(s.kelas)}) - NIS: ${escapeHtml(s.nis || '-')}
             </option>
           `).join('')}
@@ -1885,11 +1950,11 @@ function openManualAbsensiModal(siswaId = null, defaultDate = null) {
       <div class="form-row">
         <div class="form-group">
           <label>Jam Masuk</label>
-          <input type="text" id="modal-absen-jam-masuk" value="${jamMsk}" placeholder="07:05:00" style="width:100%; font-family:'IBM Plex Mono',monospace;">
+          <input type="text" id="modal-absen-jam-masuk" value="${jamMsk}" placeholder="07:05:00" style="width:100%; font-family:'IBM Plex Mono',monospace;" ${isAbsentStatus ? 'disabled' : ''}>
         </div>
         <div class="form-group">
           <label>Jam Pulang</label>
-          <input type="text" id="modal-absen-jam-pulang" value="${jamPlg}" placeholder="14:00:00" style="width:100%; font-family:'IBM Plex Mono',monospace;">
+          <input type="text" id="modal-absen-jam-pulang" value="${jamPlg}" placeholder="14:00:00" style="width:100%; font-family:'IBM Plex Mono',monospace;" ${isAbsentStatus ? 'disabled' : ''}>
         </div>
       </div>
       <div class="form-group">
@@ -1905,20 +1970,65 @@ function openManualAbsensiModal(siswaId = null, defaultDate = null) {
 
   openModal(html);
 
+  const selSiswa = document.getElementById('modal-absen-siswa');
+  const inTgl = document.getElementById('modal-absen-tgl');
+  const selStatus = document.getElementById('modal-absen-status');
+  const inJamMasuk = document.getElementById('modal-absen-jam-masuk');
+  const inJamPulang = document.getElementById('modal-absen-jam-pulang');
+  const inKet = document.getElementById('modal-absen-ket');
+  const titleEl = document.getElementById('modal-absen-title');
+
+  const syncTimeInputsForStatus = (st) => {
+    const absent = st === 'izin' || st === 'sakit' || st === 'alpa';
+    if (inJamMasuk) {
+      inJamMasuk.disabled = absent;
+      if (absent) inJamMasuk.value = '';
+      else if (!inJamMasuk.value) inJamMasuk.value = getCurrentTimeStr();
+    }
+    if (inJamPulang) {
+      inJamPulang.disabled = absent;
+      if (absent) inJamPulang.value = '';
+    }
+  };
+
+  const syncExistingForSelection = () => {
+    const sId = selSiswa?.value;
+    const tglVal = inTgl?.value;
+    const rec = (store.state.absensi || []).find(a => a.siswaId === sId && a.tanggal === tglVal);
+    if (titleEl) titleEl.textContent = rec ? 'Ubah Status Absensi' : 'Catat Absensi Manual / Izin';
+    if (rec) {
+      if (selStatus) selStatus.value = rec.status;
+      if (inJamMasuk) inJamMasuk.value = rec.jamMasuk || '';
+      if (inJamPulang) inJamPulang.value = rec.jamPulang || '';
+      if (inKet) inKet.value = rec.keterangan || '';
+      syncTimeInputsForStatus(rec.status);
+    } else {
+      const st = selStatus ? selStatus.value : 'hadir';
+      if (inJamPulang) inJamPulang.value = '';
+      if (inKet) inKet.value = '';
+      syncTimeInputsForStatus(st);
+    }
+  };
+
+  selSiswa?.addEventListener('change', syncExistingForSelection);
+  inTgl?.addEventListener('change', syncExistingForSelection);
+  selStatus?.addEventListener('change', e => syncTimeInputsForStatus(e.target.value));
+
   document.getElementById('modal-save-absen')?.addEventListener('click', () => {
-    const sId = document.getElementById('modal-absen-siswa').value;
-    const tgl = document.getElementById('modal-absen-tgl').value;
-    const st = document.getElementById('modal-absen-status').value;
-    const jMsk = document.getElementById('modal-absen-jam-masuk').value.trim();
-    const jPlg = document.getElementById('modal-absen-jam-pulang').value.trim();
-    const k = document.getElementById('modal-absen-ket').value.trim();
+    const sId = selSiswa.value;
+    const tgl = inTgl.value;
+    const st = selStatus.value;
+    const jMsk = inJamMasuk.value.trim();
+    const jPlg = inJamPulang.value.trim();
+    const k = inKet.value.trim();
+    const currentRec = (store.state.absensi || []).find(a => a.siswaId === sId && a.tanggal === tgl);
 
     manualAddOrUpdateAbsensi({
-      id: existingRecord?.id,
+      id: currentRec?.id,
       siswaId: sId,
       tanggal: tgl,
-      jamMasuk: (st === 'izin' || st === 'sakit' || st === 'alpa') ? null : jMsk,
-      jamPulang: jPlg || null,
+      jamMasuk: (st === 'izin' || st === 'sakit' || st === 'alpa') ? null : (jMsk || null),
+      jamPulang: (st === 'izin' || st === 'sakit' || st === 'alpa') ? null : (jPlg || null),
       status: st,
       keterangan: k
     });

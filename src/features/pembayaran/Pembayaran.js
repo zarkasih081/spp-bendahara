@@ -1,13 +1,17 @@
 import { store } from '../../app/state.js';
-import { getPeriode, emptyState, siswaTotalBulan, toast, BULAN } from '../../utils/helpers.js';
-import { fmtDate, fmtRupiah, escapeHtml } from '../../utils/formatters.js';
+import { getPeriode, currentPeriodeEntry, siswaTunggakan, emptyState, siswaTotalBulan, toast, BULAN } from '../../utils/helpers.js';
+import { fmtDate, fmtRupiah, escapeHtml, escapeAttr } from '../../utils/formatters.js';
 import { triggerRender } from '../../utils/events.js';
 import { openConfirm } from '../../components/Modal.js';
-import { getPembayaranBySiswaId, savePembayaranSPP, savePembayaranIjazah, generateNoKwitansi, cancelPembayaran, getSisaTagihanIjazah } from './pembayaranService.js';
+import { getPembayaranBySiswaId, getSuggestedSppNominal, savePembayaranSPP, savePembayaranIjazah, generateNoKwitansi, cancelPembayaran, getSisaTagihanIjazah } from './pembayaranService.js';
 import { cetakKwitansi } from './kwitansi.js';
 
 export function renderBayar(){
   const el = document.getElementById('page-bayar');
+  const wasSearchFocused = document.activeElement?.id === 'bayar-siswa-search';
+  const selStart = wasSearchFocused ? document.activeElement.selectionStart : null;
+  const selEnd = wasSearchFocused ? document.activeElement.selectionEnd : null;
+
   if(store.state.siswa.length===0){
     el.innerHTML = emptyState('<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>', 'Belum ada data siswa', 'Tambahkan siswa terlebih dahulu sebelum mencatat pembayaran.', 'Tambah Data Siswa', () => {
       store.ui.page = 'siswa';
@@ -19,9 +23,21 @@ export function renderBayar(){
     });
     return;
   }
-  const sorted = [...store.state.siswa].sort((a,b)=> a.kelas.localeCompare(b.kelas) || a.nama.localeCompare(b.nama));
-  const existingSiswa = store.state.siswa.find(s => s.id === store.ui.bayarSiswaId);
-  const siswa = existingSiswa || sorted[0];
+
+  const kelasList = [...new Set(store.state.siswa.map(s=>s.kelas))].sort();
+  const bayarKelasFilter = store.ui.bayarKelasFilter || '';
+  const bayarSearch = store.ui.bayarSiswaSearch || '';
+
+  const allSorted = [...store.state.siswa].sort((a,b)=> a.kelas.localeCompare(b.kelas) || a.nama.localeCompare(b.nama));
+  const filteredSiswa = allSorted.filter(s => {
+    const matchKelas = !bayarKelasFilter || s.kelas === bayarKelasFilter;
+    const matchSearch = !bayarSearch || s.nama.toLowerCase().includes(bayarSearch.toLowerCase()) || (s.nis||'').includes(bayarSearch);
+    return matchKelas && matchSearch;
+  });
+
+  const listToUse = filteredSiswa.length > 0 ? filteredSiswa : allSorted;
+  const existingSiswa = listToUse.find(s => s.id === store.ui.bayarSiswaId);
+  const siswa = existingSiswa || listToUse[0];
   const selectedId = siswa.id;
   store.ui.bayarSiswaId = selectedId;
   
@@ -32,6 +48,7 @@ export function renderBayar(){
   const nominalIjazah = store.state.settings.nominalIjazah || 500000;
   
   const tagihanIjazah = getSisaTagihanIjazah(siswa.id, nominalIjazah);
+  const tunggakanSiswa = siswaTunggakan(siswa.id);
 
   el.innerHTML = `
     <div class="tabs" style="margin-bottom: 16px;">
@@ -39,30 +56,63 @@ export function renderBayar(){
       <button class="tab-btn ${jenis==='ijazah'?'active':''}" id="tab-ijazah">Pembayaran Ijazah</button>
     </div>
     <div class="card">
-      <div class="form-row">
-        <div class="form-group">
-          <label>Pilih Siswa</label>
+      <div class="form-row" style="margin-bottom:10px;">
+        <div class="form-group" style="margin-bottom:0;">
+          <label>Filter Cepat Siswa (Nama / NIS / Kelas)</label>
+          <div style="display:flex; gap:8px;">
+            <input class="search-input" id="bayar-siswa-search" placeholder="Ketik nama atau NIS siswa..." value="${escapeAttr(bayarSearch)}" style="flex:1; min-width:0;">
+            <select id="bayar-kelas-filter" style="width:140px;">
+              <option value="">Semua Kelas</option>
+              ${kelasList.map(k=>`<option value="${escapeAttr(k)}" ${bayarKelasFilter===k?'selected':''}>${escapeHtml(k)}</option>`).join('')}
+            </select>
+          </div>
+          ${filteredSiswa.length === 0 ? `<div class="helper-text" style="color:var(--rust);">Tidak ada siswa yang cocok dengan pencarian "${escapeHtml(bayarSearch)}". Menampilkan semua siswa.</div>` : ''}
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label>Pilih Siswa (${listToUse.length} siswa)</label>
           <select id="bayar-siswa-select" style="width:100%;">
-            ${sorted.map(s=>`<option value="${s.id}" ${s.id===selectedId?'selected':''}>${escapeHtml(s.nama)} — ${escapeHtml(s.kelas)}</option>`).join('')}
+            ${listToUse.map(s=>`<option value="${s.id}" ${s.id===selectedId?'selected':''}>${escapeHtml(s.nama)} — ${escapeHtml(s.kelas)} ${s.nis ? `(${escapeHtml(s.nis)})` : ''}</option>`).join('')}
           </select>
         </div>
-        <div class="form-group">
-          <label>${jenis==='spp' ? 'Nominal SPP per Bulan' : 'Tagihan Ijazah (Total)'}</label>
-          <input value="${jenis==='spp' ? fmtRupiah(nominalSPP) : fmtRupiah(nominalIjazah)}" disabled style="width:100%;">
+      </div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; background:var(--paper-dim); padding:10px 14px; border-radius:var(--radius); border:1px solid var(--line); margin-top:12px;">
+        <div style="font-size:12.5px;">
+          Siswa Terpilih: <strong>${escapeHtml(siswa.nama)}</strong> <span class="kelas-chip">${escapeHtml(siswa.kelas)}</span>
+          ${siswa.nis ? `<span style="color:var(--ink-soft); margin-left:6px;">NIS: ${escapeHtml(siswa.nis)}</span>` : ''}
+        </div>
+        <div style="font-size:12.5px;">
+          ${jenis === 'spp'
+            ? `Ketetapan SPP: <strong>${fmtRupiah(nominalSPP)}/bln</strong> • Tunggakan berjalan: <strong style="color:${tunggakanSiswa.totalKurang > 0 ? 'var(--rust)' : '#10B981'};">${tunggakanSiswa.totalKurang > 0 ? `${tunggakanSiswa.jumlahBulan} bln (${fmtRupiah(tunggakanSiswa.totalKurang)})` : 'Lunas'}</strong>`
+            : `Total Ketetapan Ijazah: <strong>${fmtRupiah(nominalIjazah)}</strong>`}
         </div>
       </div>
+
       <div class="divider"></div>
       
       ${jenis==='spp' ? `
-        <label>Pilih bulan yang dibayar (klik untuk pilih, hijau = sudah lunas)</label>
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+          <label style="margin:0;">Pilih bulan yang dibayar (klik untuk pilih, hijau = sudah lunas)</label>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-sm btn-secondary" id="btn-select-bulan-ini">Pilih Bulan Ini</button>
+            ${tunggakanSiswa.jumlahBulan > 0 ? `<button type="button" class="btn btn-sm btn-outline" id="btn-select-tunggakan">Pilih Semua Tunggakan (${tunggakanSiswa.jumlahBulan})</button>` : ''}
+            <button type="button" class="btn btn-sm btn-ghost" id="btn-reset-bulan">Reset Pilihan</button>
+          </div>
+        </div>
         <div class="month-grid" id="month-grid"></div>
-        <div class="helper-text">Bisa pilih lebih dari satu bulan sekaligus. Klasifikasi tunggakan mengikuti Tahun Ajaran ${store.state.settings.tahunAjaran}.</div>
+        <div class="helper-text">Bisa pilih lebih dari satu bulan sekaligus. Pembayaran sebagian akan otomatis melunasi kekurangan bulan pertama terlebih dahulu.</div>
       ` : `
-        <div style="background:var(--paper-dim); padding:12px; border-radius:6px; margin-bottom:14px;">
+        <div style="background:var(--paper-dim); padding:12px 14px; border-radius:8px; border:1px solid var(--line); margin-bottom:14px;">
           <div style="display:flex; justify-content:space-between; margin-bottom:4px;"><span>Total Tagihan Ijazah:</span> <strong>${fmtRupiah(nominalIjazah)}</strong></div>
           <div style="display:flex; justify-content:space-between; margin-bottom:4px; color:#10B981;"><span>Sudah Terbayar:</span> <strong>${fmtRupiah(tagihanIjazah.terbayar)}</strong></div>
           <div class="divider" style="margin:8px 0;"></div>
-          <div style="display:flex; justify-content:space-between; color:var(--rust); font-weight:600;"><span>Sisa Tagihan:</span> <span>${fmtRupiah(tagihanIjazah.sisa)}</span></div>
+          <div style="display:flex; justify-content:space-between; align-items:center; color:var(--rust); font-weight:600;">
+            <span>Sisa Tagihan:</span>
+            <div style="display:flex; align-items:center; gap:8px;">
+              <span>${fmtRupiah(tagihanIjazah.sisa)}</span>
+              ${tagihanIjazah.sisa > 0 ? `<button type="button" class="btn btn-sm btn-outline" id="btn-fill-sisa-ijazah" style="padding:3px 10px; font-size:11.5px;">Lunasi Sisa</button>` : ''}
+            </div>
+          </div>
         </div>
       `}
 
@@ -101,9 +151,81 @@ export function renderBayar(){
   document.getElementById('tab-spp').addEventListener('click', ()=>{ store.ui.bayarJenis='spp'; store.ui.bayarSelectedMonths=[]; renderBayar(); });
   document.getElementById('tab-ijazah').addEventListener('click', ()=>{ store.ui.bayarJenis='ijazah'; store.ui.bayarSelectedMonths=[]; renderBayar(); });
 
+  const searchIn = document.getElementById('bayar-siswa-search');
+  searchIn?.addEventListener('input', e => {
+    store.ui.bayarSiswaSearch = e.target.value;
+    store.ui.bayarSelectedMonths = [];
+    renderBayar();
+  });
+  if (wasSearchFocused && searchIn) {
+    searchIn.focus();
+    if (selStart !== null) searchIn.setSelectionRange(selStart, selEnd);
+  }
+
+  document.getElementById('bayar-kelas-filter')?.addEventListener('change', e => {
+    store.ui.bayarKelasFilter = e.target.value;
+    store.ui.bayarSelectedMonths = [];
+    renderBayar();
+  });
+
   document.getElementById('bayar-siswa-select').addEventListener('change', e=>{
     store.ui.bayarSiswaId = e.target.value; store.ui.bayarSelectedMonths = []; renderBayar();
   });
+
+  // Quick selection buttons for SPP
+  document.getElementById('btn-select-bulan-ini')?.addEventListener('click', () => {
+    const cur = currentPeriodeEntry();
+    const total = siswaTotalBulan(siswa.id, cur.bulan, cur.tahun);
+    if (total >= nominalSPP) {
+      toast(`SPP bulan ${BULAN[cur.bulan-1]} ${cur.tahun} sudah lunas`, 'info');
+      return;
+    }
+    store.ui.bayarSelectedMonths = [{ bulan: cur.bulan, tahun: cur.tahun }];
+    renderMonthGrid(siswa, periode, nominalSPP);
+    updateNominalHint(nominalSPP);
+    const nomInput = document.getElementById('bayar-nominal');
+    if (nomInput) {
+      delete nomInput.dataset.touched;
+      const suggested = getSuggestedSppNominal(siswa.id, store.ui.bayarSelectedMonths, nominalSPP);
+      nomInput.value = suggested > 0 ? suggested.toLocaleString('id-ID') : '';
+    }
+  });
+
+  document.getElementById('btn-select-tunggakan')?.addEventListener('click', () => {
+    if (tunggakanSiswa.bulanBelum.length === 0) {
+      toast('Tidak ada bulan tertunggak untuk siswa ini', 'info');
+      return;
+    }
+    store.ui.bayarSelectedMonths = tunggakanSiswa.bulanBelum.map(m => ({ bulan: m.bulan, tahun: m.tahun }));
+    renderMonthGrid(siswa, periode, nominalSPP);
+    updateNominalHint(nominalSPP);
+    const nomInput = document.getElementById('bayar-nominal');
+    if (nomInput) {
+      delete nomInput.dataset.touched;
+      const suggested = getSuggestedSppNominal(siswa.id, store.ui.bayarSelectedMonths, nominalSPP);
+      nomInput.value = suggested > 0 ? suggested.toLocaleString('id-ID') : '';
+    }
+  });
+
+  document.getElementById('btn-reset-bulan')?.addEventListener('click', () => {
+    store.ui.bayarSelectedMonths = [];
+    renderMonthGrid(siswa, periode, nominalSPP);
+    updateNominalHint(nominalSPP);
+    const nomInput = document.getElementById('bayar-nominal');
+    if (nomInput) {
+      delete nomInput.dataset.touched;
+      nomInput.value = '';
+    }
+  });
+
+  document.getElementById('btn-fill-sisa-ijazah')?.addEventListener('click', () => {
+    const nomInput = document.getElementById('bayar-nominal');
+    if (nomInput && tagihanIjazah.sisa > 0) {
+      nomInput.value = tagihanIjazah.sisa.toLocaleString('id-ID');
+      nomInput.dataset.touched = '1';
+    }
+  });
+
   document.getElementById('bayar-nominal').addEventListener('input', e=>{
     let val = e.target.value.replace(/[^0-9]/g, '');
     if(val) val = parseInt(val, 10).toLocaleString('id-ID');
@@ -120,11 +242,12 @@ function renderMonthGrid(siswa, periode, nominal){
   grid.innerHTML = periode.map(p=>{
     const total = siswaTotalBulan(siswa.id, p.bulan, p.tahun);
     const isPaid = total >= nominal;
+    const kurang = Math.max(0, nominal - total);
     const isSelected = store.ui.bayarSelectedMonths.some(m=>m.bulan===p.bulan && m.tahun===p.tahun);
     const cls = isPaid ? 'paid' : (isSelected ? 'selected' : '');
     return `<div class="month-pill ${cls}" data-b="${p.bulan}" data-t="${p.tahun}">
       ${BULAN[p.bulan-1]} '${String(p.tahun).slice(2)}
-      <span class="chk">${isPaid?'✓ Lunas':(total>0?'Sebagian':'')}</span>
+      <span class="chk">${isPaid?'✓ Lunas':(total>0?`Kurang ${fmtRupiah(kurang)}`:'')}</span>
     </div>`;
   }).join('');
   grid.querySelectorAll('.month-pill:not(.paid)').forEach(pill=>{
@@ -137,7 +260,8 @@ function renderMonthGrid(siswa, periode, nominal){
       updateNominalHint(nominal);
       const nomInput = document.getElementById('bayar-nominal');
       if(nomInput && !nomInput.dataset.touched){
-        nomInput.value = (store.ui.bayarSelectedMonths.length * nominal).toLocaleString('id-ID');
+        const suggested = getSuggestedSppNominal(siswa.id, store.ui.bayarSelectedMonths, nominal);
+        nomInput.value = suggested > 0 ? suggested.toLocaleString('id-ID') : '';
       }
     });
   });
@@ -146,8 +270,8 @@ function renderMonthGrid(siswa, periode, nominal){
 function updateNominalHint(nominal){
   const hint = document.getElementById('nominal-hint');
   const n = store.ui.bayarSelectedMonths.length;
-  const suggested = n * nominal;
-  hint.textContent = n>0 ? `${n} bulan dipilih · saran nominal ${fmtRupiah(suggested)}` : 'Pilih bulan terlebih dahulu';
+  const suggested = getSuggestedSppNominal(store.ui.bayarSiswaId, store.ui.bayarSelectedMonths, nominal);
+  hint.textContent = n>0 ? `${n} bulan dipilih · saran pelunasan ${fmtRupiah(suggested)}` : 'Pilih bulan terlebih dahulu';
 }
 
 function renderBayarRiwayat(siswa){

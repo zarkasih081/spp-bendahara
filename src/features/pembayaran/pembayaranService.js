@@ -1,19 +1,39 @@
 import { store } from '../../app/state.js';
 import { saveData } from '../../data/database.js';
-import { uid } from '../../utils/helpers.js';
+import { uid, siswaTotalBulan } from '../../utils/helpers.js';
 
 export function getPembayaranBySiswaId(siswaId) {
   return store.state.pembayaran.filter(p => p.siswaId === siswaId).sort((a,b)=> new Date(b.tanggal)-new Date(a.tanggal));
 }
 
+export function getSuggestedSppNominal(siswaId, months, nominalSPP) {
+  if (!months || months.length === 0) return 0;
+  return months.reduce((sum, m) => {
+    const sudah = siswaTotalBulan(siswaId, m.bulan, m.tahun);
+    const kurang = Math.max(0, nominalSPP - sudah);
+    return sum + (kurang > 0 ? kurang : nominalSPP);
+  }, 0);
+}
+
 export function savePembayaranSPP(siswaId, nominal, tanggal, ket, months, noKwitansi) {
-  const per = Math.floor(nominal / months.length);
-  const remainder = nominal - per * months.length;
-  months.forEach((m, i) => {
-    store.state.pembayaran.push({
-      id: uid(), siswaId, jenis: 'spp', bulan: m.bulan, tahun: m.tahun,
-      tanggal, nominal: per + (i === 0 ? remainder : 0), keterangan: ket, noKwitansi
-    });
+  const nominalSPP = store.state.settings.nominalSPP || 0;
+  const sortedMonths = [...months].sort((a, b) => (a.tahun - b.tahun) || (a.bulan - b.bulan));
+  let sisaUang = nominal;
+
+  sortedMonths.forEach((m, i) => {
+    if (sisaUang <= 0) return;
+    const sudah = siswaTotalBulan(siswaId, m.bulan, m.tahun);
+    const kurang = Math.max(0, nominalSPP - sudah);
+    const targetBulanIni = kurang > 0 ? kurang : nominalSPP;
+    const alokasi = (i === sortedMonths.length - 1) ? sisaUang : Math.min(sisaUang, targetBulanIni);
+    sisaUang -= alokasi;
+
+    if (alokasi > 0) {
+      store.state.pembayaran.push({
+        id: uid(), siswaId, jenis: 'spp', bulan: m.bulan, tahun: m.tahun,
+        tanggal, nominal: alokasi, keterangan: ket, noKwitansi
+      });
+    }
   });
   saveData('Pembayaran tersimpan');
 }

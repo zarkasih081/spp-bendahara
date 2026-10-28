@@ -3,6 +3,8 @@ import { saveData } from '../../data/database.js';
 import { getPeriode, BULAN, downloadFile, toast } from '../../utils/helpers.js';
 import { escapeHtml, escapeAttr, fmtDate, fmtRupiah } from '../../utils/formatters.js';
 import { openConfirm } from '../../components/Modal.js';
+import { cetakKwitansi } from '../pembayaran/kwitansi.js';
+import * as XLSX from 'xlsx';
 
 export function renderLaporan(){
   const el = document.getElementById('page-laporan');
@@ -35,8 +37,9 @@ export function renderLaporan(){
         <select id="laporan-tahun">${tahunOptions.map(t=>`<option value="${t}" ${store.ui.laporanTahun===t?'selected':''}>${t}</option>`).join('')}</select>
         <select id="laporan-kelas"><option value="">Semua Kelas</option>${kelasList.map(k=>`<option value="${escapeAttr(k)}" ${store.ui.laporanKelas===k?'selected':''}>${escapeHtml(k)}</option>`).join('')}</select>
       </div>
-      <div class="toolbar-right">
+      <div class="toolbar-right" style="gap:8px;">
         <button class="btn" id="btn-export-laporan"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16"/></svg> Export CSV</button>
+        <button class="btn btn-primary" id="btn-export-laporan-excel"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg> Export Excel</button>
       </div>
     </div>
 
@@ -54,7 +57,7 @@ export function renderLaporan(){
     <div class="card" style="padding:0;">
       <div class="table-scroll">
         <table>
-          <thead><tr><th>Tanggal</th><th>Nama Siswa</th><th>Kelas</th><th>No. Kwitansi</th><th>Jenis</th><th class="num">Nominal</th><th style="width:40px;"></th></tr></thead>
+          <thead><tr><th>Tanggal</th><th>Nama Siswa</th><th>Kelas</th><th>No. Kwitansi</th><th>Jenis</th><th class="num">Nominal</th><th style="width:80px; text-align:right;">Aksi</th></tr></thead>
           <tbody id="laporan-tbody"></tbody>
         </table>
       </div>
@@ -71,13 +74,21 @@ export function renderLaporan(){
         <td>${escapeHtml(s.nama)}</td>
         <td><span class="kelas-chip">${escapeHtml(s.kelas)}</span></td>
         <td>${p.noKwitansi||'-'}</td>
-        <td>${p.jenis==='ijazah' ? 'Ijazah' : 'SPP'}</td>
+        <td>${p.jenis==='ijazah' ? 'Ijazah' : `SPP (${BULAN[(p.bulan||1)-1]} ${p.tahun||''})`}</td>
         <td class="num">${fmtRupiah(p.nominal)}</td>
-        <td style="text-align:right;">
+        <td style="text-align:right; white-space:nowrap;">
+          <button class="btn btn-sm btn-ghost" data-cetak-lap="${p.id}" title="Cetak Ulang Kwitansi"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M6 9V3h12v6M6 18h12v4H6v-4zM4 9h16v7H4z"/></svg></button>
           <button class="btn btn-sm btn-ghost" data-del-lap="${p.id}" title="Hapus transaksi" style="color:var(--rust);"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
         </td>
       </tr>`;
     }).join('');
+    tbody.querySelectorAll('[data-cetak-lap]').forEach(b=>b.addEventListener('click', ()=>{
+      const p = store.state.pembayaran.find(x=>x.id===b.dataset.cetakLap);
+      if (!p) return;
+      const s = store.state.siswa.find(x=>x.id===p.siswaId) || { nama:'(Siswa Dihapus)', kelas:'-', nis:'-' };
+      const jenis = p.jenis || 'spp';
+      cetakKwitansi(s, [{ bulan: p.bulan || 1, tahun: p.tahun || new Date().getFullYear() }], p.nominal, p.noKwitansi || 'KW-ARSIP', p.tanggal, jenis);
+    }));
     tbody.querySelectorAll('[data-del-lap]').forEach(b=>b.addEventListener('click', ()=>{
       openConfirm('Batalkan transaksi pembayaran ini?', ()=>{
         store.state.pembayaran = store.state.pembayaran.filter(x=>x.id!==b.dataset.delLap);
@@ -90,6 +101,35 @@ export function renderLaporan(){
   document.getElementById('laporan-tahun').addEventListener('change', e=>{ store.ui.laporanTahun=+e.target.value; renderLaporan(); });
   document.getElementById('laporan-kelas').addEventListener('change', e=>{ store.ui.laporanKelas=e.target.value; renderLaporan(); });
   document.getElementById('btn-export-laporan').addEventListener('click', ()=>exportLaporanCsv(rows));
+  document.getElementById('btn-export-laporan-excel').addEventListener('click', ()=>exportLaporanExcel(rows));
+}
+
+function exportLaporanExcel(rows){
+  if(rows.length===0){ toast('Tidak ada data untuk diexport', 'warning'); return; }
+  const sheetRows = rows.map((p, idx) => {
+    const s = store.state.siswa.find(x=>x.id===p.siswaId) || {nama:'(dihapus)',kelas:'-',nis:'-'};
+    const jenis = p.jenis === 'ijazah' ? 'Ijazah' : 'SPP';
+    const bln = p.jenis === 'ijazah' ? '-' : BULAN[(p.bulan||1)-1];
+    const thn = p.jenis === 'ijazah' ? '-' : (p.tahun||'');
+    return {
+      'No': idx + 1,
+      'Tanggal': fmtDate(p.tanggal),
+      'Nama Siswa': s.nama,
+      'Kelas': s.kelas,
+      'NIS': s.nis || '-',
+      'No. Kwitansi': p.noKwitansi || '-',
+      'Jenis': jenis,
+      'Bulan SPP': bln,
+      'Tahun SPP': thn,
+      'Nominal (Rp)': p.nominal,
+      'Keterangan': p.keterangan || '-'
+    };
+  });
+  const ws = XLSX.utils.json_to_sheet(sheetRows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Laporan Pemasukan');
+  XLSX.writeFile(wb, `Laporan_Pemasukan_${BULAN[store.ui.laporanBulan-1]}_${store.ui.laporanTahun}.xlsx`);
+  toast('Laporan Excel berhasil didownload', 'success');
 }
 
 function exportLaporanCsv(rows){

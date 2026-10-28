@@ -27,6 +27,102 @@ export function getStudentInitials(name) {
   return name.slice(0, 2).toUpperCase();
 }
 
+export async function downloadStudentQrCardPng(siswa) {
+  const qrDataUrl = await generateQrDataUrl(siswa.nis || siswa.id);
+  const settings = store.state?.settings || {};
+  const namaSekolah = settings.namaSekolah || 'MTs Yasta Bunter';
+  const tahunAjaran = settings.tahunAjaran || '';
+
+  const canvas = document.createElement('canvas');
+  canvas.width = 600;
+  canvas.height = 760;
+  const ctx = canvas.getContext('2d');
+
+  // Background card
+  ctx.fillStyle = '#0F172A';
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+  // Header gradient
+  const grad = ctx.createLinearGradient(0, 0, canvas.width, 160);
+  grad.addColorStop(0, '#1E1B4B');
+  grad.addColorStop(1, '#333594');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, canvas.width, 155);
+
+  // Accent top bar
+  ctx.fillStyle = '#38BDF8';
+  ctx.fillRect(0, 0, canvas.width, 6);
+
+  // School Name & Subtitle
+  ctx.fillStyle = '#FFFFFF';
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 24px Outfit, Plus Jakarta Sans, sans-serif';
+  ctx.fillText(namaSekolah.toUpperCase(), canvas.width / 2, 68);
+
+  ctx.fillStyle = '#38BDF8';
+  ctx.font = 'bold 14px Plus Jakarta Sans, sans-serif';
+  ctx.fillText('KARTU QR PRESENSI & IDENTITAS SISWA', canvas.width / 2, 98);
+
+  if (tahunAjaran) {
+    ctx.fillStyle = '#CBD5E1';
+    ctx.font = '600 13px Plus Jakarta Sans, sans-serif';
+    ctx.fillText(`Tahun Ajaran ${tahunAjaran}`, canvas.width / 2, 124);
+  }
+
+  // White QR container box
+  const qrBoxSize = 330;
+  const qrBoxX = (canvas.width - qrBoxSize) / 2;
+  const qrBoxY = 185;
+
+  ctx.fillStyle = '#FFFFFF';
+  ctx.beginPath();
+  ctx.roundRect(qrBoxX, qrBoxY, qrBoxSize, qrBoxSize, 24);
+  ctx.fill();
+
+  // Draw QR Image inside box
+  const qrImg = new Image();
+  await new Promise((resolve) => {
+    qrImg.onload = resolve;
+    qrImg.onerror = resolve;
+    qrImg.src = qrDataUrl;
+  });
+  ctx.drawImage(qrImg, qrBoxX + 25, qrBoxY + 25, qrBoxSize - 50, qrBoxSize - 50);
+
+  // Student Name
+  ctx.fillStyle = '#F8FAFC';
+  ctx.font = 'bold 26px Outfit, Plus Jakarta Sans, sans-serif';
+  const displayName = siswa.nama.length > 28 ? siswa.nama.slice(0, 26) + '...' : siswa.nama;
+  ctx.fillText(displayName, canvas.width / 2, 568);
+
+  // NIS & Kelas Pill
+  const metaText = `NIS: ${siswa.nis || '-'}   •   KELAS: ${siswa.kelas || '-'}`;
+  ctx.fillStyle = '#1E293B';
+  ctx.beginPath();
+  ctx.roundRect(110, 592, 380, 44, 22);
+  ctx.fill();
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  ctx.fillStyle = '#38BDF8';
+  ctx.font = 'bold 16px IBM Plex Mono, monospace';
+  ctx.fillText(metaText, canvas.width / 2, 620);
+
+  // Footer instructions
+  ctx.fillStyle = '#94A3B8';
+  ctx.font = '500 13px Plus Jakarta Sans, sans-serif';
+  ctx.fillText('Tunjukkan kode QR ini ke pemindai kamera gerbang sekolah', canvas.width / 2, 690);
+
+  ctx.fillStyle = '#64748B';
+  ctx.font = '500 11px IBM Plex Mono, monospace';
+  ctx.fillText(`ID: ${siswa.id.slice(0, 10).toUpperCase()} • Sistem EduPass`, canvas.width / 2, 722);
+
+  const a = document.createElement('a');
+  a.href = canvas.toDataURL('image/png');
+  a.download = `Kartu_QR_${siswa.nama.replace(/\s+/g, '_')}_${siswa.nis || siswa.id}.png`;
+  a.click();
+}
+
 export async function renderStudentCardHtml(siswa, options = {}) {
   const qrDataUrl = await generateQrDataUrl(siswa.nis || siswa.id);
   const settings = store.state?.settings || {};

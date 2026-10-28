@@ -1,9 +1,10 @@
 import { store } from '../../app/state.js';
-import { currentPeriodeEntry, getPeriode, siswaTunggakan, siswaStatusBulan, siswaTotalBulan, BULAN, emptyState } from '../../utils/helpers.js';
+import { currentPeriodeEntry, getPeriode, getActiveTahunMulai, siswaTunggakan, siswaStatusBulan, siswaTotalBulan, BULAN, emptyState, toast } from '../../utils/helpers.js';
 import { escapeHtml, escapeAttr, fmtRupiah, formatWaLink } from '../../utils/formatters.js';
 import { triggerRender } from '../../utils/events.js';
-import { openModal } from '../../components/Modal.js';
+import { openModal, closeModal } from '../../components/Modal.js';
 import { cetakKwitansi } from '../pembayaran/kwitansi.js';
+import { parseLocalDate } from '../absensi/absensiService.js';
 
 export function renderRiwayat(){
   const el = document.getElementById('page-riwayat');
@@ -14,23 +15,47 @@ export function renderRiwayat(){
     const s = store.state.siswa.find(x => x.id === user.id);
     if (!s) { el.innerHTML = emptyState('', 'Data tidak ditemukan', '', ''); return; }
     
+    const activeTaStart = getActiveTahunMulai();
+    const baseTa = store.state.settings.tahunMulai || new Date().getFullYear();
+    const taOptions = [];
+    for (let y = baseTa - 2; y <= baseTa + 2; y++) {
+      taOptions.push(y);
+    }
+
     const periode = getPeriode();
     const t = siswaTunggakan(s.id);
     const nominal = store.state.settings.nominalSPP;
     const nominalIjazah = store.state.settings.nominalIjazah || 500000;
+    const jenisFilter = store.ui.siswaRiwayatJenisFilter || 'all';
     
     // Get their payments
-    const payments = store.state.pembayaran.filter(p => p.siswaId === s.id).sort((a,b)=> new Date(b.tanggal) - new Date(a.tanggal));
+    const payments = store.state.pembayaran.filter(p => p.siswaId === s.id).sort((a,b)=> parseLocalDate(b.tanggal) - parseLocalDate(a.tanggal));
+    const filteredPayments = payments.filter(p => {
+      if (jenisFilter === 'spp') return !p.jenis || p.jenis === 'spp';
+      if (jenisFilter === 'ijazah') return p.jenis === 'ijazah';
+      return true;
+    });
     const ijazahTerbayar = payments.filter(p=>p.jenis==='ijazah').reduce((sum, p)=>sum+p.nominal, 0);
     const cur = currentPeriodeEntry();
 
     el.innerHTML = `
       <!-- 12-Month Academic Year Payment Timeline -->
       <div class="card">
-        <div style="display:flex; justify-content:space-between; align-items:flex-start; flex-wrap:wrap; gap:8px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
           <div>
             <h3 style="margin:0; font-size:16px;">Jadwal & Status SPP per Bulan</h3>
-            <div class="card-sub" style="margin-top:2px;">Tahun Ajaran ${escapeHtml(store.state.settings.tahunAjaran)} • ${t.jumlahBulan > 0 ? `<span style="color:#DC2626; font-weight:700;">${t.jumlahBulan} Bulan Menunggak</span>` : `<span style="color:#059669; font-weight:700;">Semua Bulan Berjalan Lunas</span>`}</div>
+            <div class="card-sub" style="margin-top:2px;">Tahun Ajaran ${activeTaStart}/${activeTaStart+1} • ${t.jumlahBulan > 0 ? `<span style="color:#DC2626; font-weight:700;">${t.jumlahBulan} Bulan Menunggak (${fmtRupiah(t.totalKurang)})</span>` : `<span style="color:#059669; font-weight:700;">Semua Bulan Berjalan Lunas</span>`}</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+            <select id="siswa-riwayat-ta" style="font-size:12.5px; padding:6px 10px;">
+              ${taOptions.map(y => `<option value="${y}" ${y === activeTaStart ? 'selected' : ''}>TA ${y}/${y+1}</option>`).join('')}
+            </select>
+            ${t.totalKurang > 0 ? `
+              <button type="button" class="btn btn-sm" id="btn-siswa-wa-tagihan" style="background:#25D366; color:#fff; border-color:#25D366;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                <span>Konfirmasi WA</span>
+              </button>
+            ` : ''}
           </div>
         </div>
 
@@ -69,7 +94,7 @@ export function renderRiwayat(){
                 <div class="tm-foot">
                   <span>${total >= nominal ? 'Kewajiban: Lunas' : `Kewajiban: ${fmtRupiah(nominal)}`}</span>
                   ${matchingPayment ? `
-                    <button type="button" class="btn-tm-receipt" data-pay-id="${matchingPayment.id}">
+                    <button type="button" class="btn-tm-receipt" data-month-b="${p.bulan}" data-month-t="${p.tahun}">
                       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
                       <span>Kwitansi</span>
                     </button>
@@ -110,24 +135,29 @@ export function renderRiwayat(){
       
       <!-- Riwayat Transaksi & Kwitansi -->
       <div class="card" style="margin-top:18px;">
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
           <div>
             <h3 style="margin:0; font-size:15px;">Daftar Transaksi & Kwitansi Resmi</h3>
             <div class="card-sub" style="margin-top:2px;">Seluruh setoran yang telah diverifikasi oleh Bendahara</div>
           </div>
+          <div class="tabs" style="padding:3px;">
+            <button type="button" class="tab-btn ${jenisFilter === 'all' ? 'active' : ''}" data-st-jenis="all" style="padding:5px 12px; font-size:12px;">Semua (${payments.length})</button>
+            <button type="button" class="tab-btn ${jenisFilter === 'spp' ? 'active' : ''}" data-st-jenis="spp" style="padding:5px 12px; font-size:12px;">SPP</button>
+            <button type="button" class="tab-btn ${jenisFilter === 'ijazah' ? 'active' : ''}" data-st-jenis="ijazah" style="padding:5px 12px; font-size:12px;">Ijazah</button>
+          </div>
         </div>
-        ${payments.length === 0 ? '<div class="empty-state">Belum ada transaksi pembayaran yang tercatat.</div>' : `
+        ${filteredPayments.length === 0 ? '<div class="empty-state" style="padding:28px;">Belum ada transaksi pembayaran pada kategori ini.</div>' : `
           <div class="transaction-list" style="margin-top:12px;">
-            ${payments.map(p => `
+            ${filteredPayments.map(p => `
               <div class="transaction-item">
                 <div class="ti-left">
                   <div class="ti-icon" style="${p.jenis === 'ijazah' ? 'background:rgba(59,130,246,0.12); color:#2563EB;' : ''}">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
                   </div>
                   <div>
-                    <div class="ti-title">${(!p.jenis || p.jenis === 'spp') ? 'SPP Bulan ' + BULAN[p.bulan-1] + ' ' + p.tahun : 'Pembayaran Ijazah'}</div>
+                    <div class="ti-title">${(!p.jenis || p.jenis === 'spp') ? 'SPP Bulan ' + BULAN[(p.bulan||1)-1] + ' ' + (p.tahun||'') : 'Pembayaran Ijazah'}</div>
                     <div class="ti-date">
-                      ${new Date(p.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}
+                      ${parseLocalDate(p.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}
                       ${p.noKwitansi ? ` • <span class="monospace" style="color:var(--primary); font-weight:600;">${escapeHtml(p.noKwitansi)}</span>` : ''}
                     </div>
                   </div>
@@ -146,24 +176,49 @@ export function renderRiwayat(){
       </div>
     `;
 
-    // Attach kwitansi click listeners
-    const openReceiptForPayment = (paymentId) => {
-      const p = payments.find(x => x.id === paymentId);
-      if (p) {
-        const months = (!p.jenis || p.jenis === 'spp') ? [{ bulan: p.bulan, tahun: p.tahun }] : [];
-        cetakKwitansi(s, months, p.nominal, p.noKwitansi || 'KW-ONLINE', p.tanggal, p.jenis || 'spp');
-      }
-    };
+    document.getElementById('siswa-riwayat-ta')?.addEventListener('change', e => {
+      store.ui.activeTahunMulai = parseInt(e.target.value, 10);
+      renderRiwayat();
+    });
 
+    document.getElementById('btn-siswa-wa-tagihan')?.addEventListener('click', () => {
+      const noHpBendahara = store.state.settings.noHpBendahara;
+      if (!noHpBendahara) {
+        toast('Nomor WhatsApp Bendahara belum diatur oleh sekolah.', 'info');
+        return;
+      }
+      const rincian = t.bulanBelum.map(m => `- ${BULAN[m.bulan-1]} ${m.tahun} (${fmtRupiah(m.kurang)})`).join('\n');
+      const teks = `Halo Bendahara ${store.state.settings.namaSekolah},\n\nSaya *${s.nama}* (Kelas ${s.kelas}, NIS: ${s.nis || '-'}) ingin melakukan konfirmasi / pembayaran tagihan SPP:\n\n${rincian}\n*Total: ${fmtRupiah(t.totalKurang)}*\n\nTerima kasih.`;
+      window.open(formatWaLink(noHpBendahara, teks), '_blank');
+    });
+
+    el.querySelectorAll('[data-st-jenis]').forEach(btn => {
+      btn.addEventListener('click', () => {
+        store.ui.siswaRiwayatJenisFilter = btn.dataset.stJenis;
+        renderRiwayat();
+      });
+    });
+
+    // Attach kwitansi click listeners
     el.querySelectorAll('.btn-tm-receipt').forEach(btn => {
       btn.addEventListener('click', () => {
-        openReceiptForPayment(btn.dataset.payId);
+        const b = +btn.dataset.monthB;
+        const th = +btn.dataset.monthT;
+        const totalBulan = siswaTotalBulan(s.id, b, th);
+        const latestPay = payments.find(pay => pay.bulan === b && pay.tahun === th && (!pay.jenis || pay.jenis === 'spp'));
+        if (latestPay) {
+          cetakKwitansi(s, [{ bulan: b, tahun: th }], totalBulan, latestPay.noKwitansi || 'KW-ONLINE', latestPay.tanggal, 'spp');
+        }
       });
     });
 
     el.querySelectorAll('.btn-print-single-pay').forEach(btn => {
       btn.addEventListener('click', () => {
-        openReceiptForPayment(btn.dataset.payId);
+        const p = payments.find(x => x.id === btn.dataset.payId);
+        if (p) {
+          const months = (!p.jenis || p.jenis === 'spp') ? [{ bulan: p.bulan, tahun: p.tahun }] : [];
+          cetakKwitansi(s, months, p.nominal, p.noKwitansi || 'KW-ONLINE', p.tanggal, p.jenis || 'spp');
+        }
       });
     });
 
@@ -242,6 +297,7 @@ export function renderRiwayat(){
       <td class="num">${fmtRupiah(r.t.totalKurang)}</td>
       <td style="display:flex; gap:4px; justify-content:flex-end;">
         ${r.s.noHp && r.t.totalKurang > 0 ? `<button class="btn btn-sm btn-ghost" style="color:#25D366;" data-wa-tagihan="${r.s.id}" title="Kirim Tagihan WA"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></button>` : ''}
+        <button class="btn btn-sm btn-secondary" data-bayar-riw="${r.s.id}" title="Catat Pembayaran Siswa Ini">Bayar</button>
         <button class="btn btn-sm btn-ghost" data-detail="${r.s.id}">Detail</button>
       </td>
     </tr>`).join('');
@@ -270,6 +326,12 @@ export function renderRiwayat(){
   document.getElementById('riwayat-kelas-filter').addEventListener('change', e=>{ store.ui.riwayatKelasFilter=e.target.value; store.ui.pageRiwayat=1; renderRiwayat(); });
   document.getElementById('riwayat-status-filter').addEventListener('change', e=>{ store.ui.riwayatStatusFilter=e.target.value; store.ui.pageRiwayat=1; renderRiwayat(); });
   tbody.querySelectorAll('[data-detail]').forEach(b=>b.addEventListener('click', ()=>openDetailSiswa(b.dataset.detail)));
+  tbody.querySelectorAll('[data-bayar-riw]').forEach(b=>b.addEventListener('click', ()=>{
+    store.ui.bayarSiswaId = b.dataset.bayarRiw;
+    store.ui.bayarSelectedMonths = [];
+    store.ui.page = 'bayar';
+    triggerRender();
+  }));
   tbody.querySelectorAll('[data-wa-tagihan]').forEach(b=>b.addEventListener('click', ()=>{
     const id = b.dataset.waTagihan;
     const s = store.state.siswa.find(x=>x.id===id);
@@ -310,9 +372,18 @@ function openDetailSiswa(id){
     </div>
     <div class="modal-foot">
       ${s.noHp && t.totalKurang > 0 ? `<button class="btn" id="btn-wa-tagihan" style="background:#25D366; color:white; border-color:#25D366; margin-right:auto;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg> Kirim Tagihan WA</button>` : ''}
-      <button class="btn btn-primary" id="modal-cancel">Tutup</button>
+      <button class="btn" id="modal-cancel">Tutup</button>
+      <button class="btn btn-primary" id="btn-detail-bayar">Input Pembayaran</button>
     </div>
   `, 'wide');
+
+  document.getElementById('btn-detail-bayar')?.addEventListener('click', () => {
+    closeModal();
+    store.ui.bayarSiswaId = s.id;
+    store.ui.bayarSelectedMonths = [];
+    store.ui.page = 'bayar';
+    triggerRender();
+  });
 
   if (s.noHp && t.totalKurang > 0) {
     document.getElementById('btn-wa-tagihan').addEventListener('click', ()=>{

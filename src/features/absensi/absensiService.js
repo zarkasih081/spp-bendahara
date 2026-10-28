@@ -11,6 +11,15 @@ export function getTodayDateStr() {
   return `${year}-${month}-${day}`;
 }
 
+export function parseLocalDate(dateStr) {
+  if (!dateStr) return new Date();
+  const parts = String(dateStr).split('-');
+  if (parts.length === 3) {
+    return new Date(+parts[0], +parts[1] - 1, +parts[2]);
+  }
+  return new Date(dateStr);
+}
+
 export function getCurrentTimeStr() {
   const now = new Date();
   const h = String(now.getHours()).padStart(2, '0');
@@ -162,6 +171,38 @@ export function catatAbsenByKode(rawCode) {
   } else {
     const record = store.state.absensi[existingIndex];
 
+    // If student was previously marked 'alpa' manually (no jamMasuk), convert to actual check-in!
+    if (record.status === 'alpa' && !record.jamMasuk) {
+      const isTerlambat = jamSekarang.slice(0, 5) > jamMasukBatas;
+      record.status = isTerlambat ? 'terlambat' : 'hadir';
+      record.jamMasuk = jamSekarang;
+      record.waktuScanMasuk = nowMs;
+      record.keterangan = isTerlambat ? `Terlambat (Batas ${jamMasukBatas})` : 'Tepat Waktu';
+      saveData();
+      playScanSound('success');
+      return {
+        success: true,
+        type: 'masuk',
+        siswa,
+        record,
+        status: record.status,
+        message: `Absen Masuk Berhasil: ${siswa.nama} (${formatTimeDisplay(jamSekarang)})`
+      };
+    }
+
+    // If student was marked 'izin' or 'sakit' (no jamMasuk), do not record jamPulang
+    if ((record.status === 'izin' || record.status === 'sakit') && !record.jamMasuk) {
+      playScanSound('warning');
+      return {
+        success: true,
+        type: 'duplicate',
+        siswa,
+        record,
+        status: record.status,
+        message: `${siswa.nama} tercatat ${record.status.toUpperCase()} hari ini (${record.keterangan || 'Tanpa keterangan'}).`
+      };
+    }
+
     // Debounce: If scanned within 20 seconds, ignore duplicate
     const lastScanMs = record.waktuScanPulang || record.waktuScanMasuk || 0;
     if (nowMs - lastScanMs < 20000) {
@@ -177,8 +218,21 @@ export function catatAbsenByKode(rawCode) {
     }
 
     // If student already has jamMasuk and hasn't checked out (jamPulang is null)
-    // Check if enough time elapsed (e.g. > 15 minutes) or past jam 10:00
     if (!record.jamPulang) {
+      const elapsedMinutes = record.waktuScanMasuk ? (nowMs - record.waktuScanMasuk) / 60000 : 999;
+      const isPastPulangWindow = jamSekarang.slice(0, 5) >= jamPulangBatas || jamSekarang.slice(0, 5) >= '10:00';
+      if (elapsedMinutes < 30 && !isPastPulangWindow) {
+        playScanSound('warning');
+        return {
+          success: true,
+          type: 'duplicate',
+          siswa,
+          record,
+          status: record.status,
+          message: `${siswa.nama} sudah Absen Masuk pukul ${formatTimeDisplay(record.jamMasuk)}. Scan pulang baru dapat dilakukan minimal 30 menit setelah masuk / saat jam pulang (${jamPulangBatas}).`
+        };
+      }
+
       record.jamPulang = jamSekarang;
       record.waktuScanPulang = nowMs;
       saveData();
@@ -214,8 +268,8 @@ export function manualAddOrUpdateAbsensi(data) {
   if (id) {
     const item = store.state.absensi.find(a => a.id === id);
     if (item) {
-      item.jamMasuk = jamMasuk || item.jamMasuk;
-      item.jamPulang = jamPulang || item.jamPulang;
+      item.jamMasuk = jamMasuk !== undefined ? jamMasuk : item.jamMasuk;
+      item.jamPulang = jamPulang !== undefined ? jamPulang : item.jamPulang;
       item.status = status || item.status;
       item.keterangan = keterangan !== undefined ? keterangan : item.keterangan;
       saveData('Data absensi diperbarui');
@@ -226,8 +280,8 @@ export function manualAddOrUpdateAbsensi(data) {
   // Check if student already has record on that date
   const existing = store.state.absensi.find(a => a.siswaId === siswaId && a.tanggal === tanggal);
   if (existing) {
-    existing.jamMasuk = jamMasuk || existing.jamMasuk;
-    existing.jamPulang = jamPulang || existing.jamPulang;
+    existing.jamMasuk = jamMasuk !== undefined ? jamMasuk : existing.jamMasuk;
+    existing.jamPulang = jamPulang !== undefined ? jamPulang : existing.jamPulang;
     existing.status = status || existing.status;
     existing.keterangan = keterangan !== undefined ? keterangan : existing.keterangan;
     saveData('Data absensi diperbarui');
@@ -295,7 +349,7 @@ export function getRiwayatAbsensiSiswa(siswaId, bulan = null, tahun = null) {
   return store.state.absensi.filter(a => {
     if (a.siswaId !== siswaId) return false;
     if (bulan && tahun) {
-      const d = new Date(a.tanggal);
+      const d = parseLocalDate(a.tanggal);
       return (d.getMonth() + 1) === bulan && d.getFullYear() === tahun;
     }
     return true;
@@ -363,7 +417,7 @@ Kelas : ${siswa.kelas}
 NIS   : ${siswa.nis || '-'}
 
 ⏰ *Waktu & Status*
-Tanggal : ${new Date(record.tanggal).toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
+Tanggal : ${parseLocalDate(record.tanggal).toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
 Waktu   : ${waktu}
 Status  : *${statusTxt.toUpperCase()}* ${record.keterangan ? `(${record.keterangan})` : ''}
 

@@ -1,10 +1,65 @@
 import { store } from '../../app/state.js';
-import { currentPeriodeEntry, siswaStatusBulan, siswaTunggakan, BULAN, emptyState, getPeriode, siswaTotalBulan, toast } from '../../utils/helpers.js';
-import { fmtRupiah, escapeHtml, formatWaLink } from '../../utils/formatters.js';
+import { saveData } from '../../data/database.js';
+import { currentPeriodeEntry, siswaStatusBulan, siswaTunggakan, BULAN, emptyState, getPeriode, getActiveTahunMulai, siswaTotalBulan, toast } from '../../utils/helpers.js';
+import { fmtRupiah, escapeHtml, escapeAttr, formatWaLink } from '../../utils/formatters.js';
 import { triggerRender } from '../../utils/events.js';
-import { getTodayDateStr, formatTimeDisplay } from '../absensi/absensiService.js';
-import { openModal } from '../../components/Modal.js';
-import { renderStudentCardHtml } from '../absensi/qrCardGenerator.js';
+import { getTodayDateStr, formatTimeDisplay, getStatistikAbsensi } from '../absensi/absensiService.js';
+import { openModal, closeModal } from '../../components/Modal.js';
+import { renderStudentCardHtml, downloadStudentQrCardPng } from '../absensi/qrCardGenerator.js';
+
+export function openStudentProfileModal(s) {
+  if (!s) return;
+  openModal(`
+    <div class="modal-head">
+      <h3>Profil & Keamanan Akun Siswa</h3>
+      <button class="close-x" id="modal-close">&times;</button>
+    </div>
+    <div class="modal-body">
+      <div style="background:var(--paper-dim); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:16px;">
+        <div style="font-size:15px; font-weight:700; color:var(--ink);">${escapeHtml(s.nama)}</div>
+        <div style="font-size:12.5px; color:var(--ink-soft); margin-top:2px;">NIS: <strong class="monospace">${escapeHtml(s.nis || '-')}</strong> • Kelas: <strong>${escapeHtml(s.kelas)}</strong></div>
+      </div>
+      <div class="form-group">
+        <label>No. WhatsApp Orang Tua / Siswa</label>
+        <input type="text" id="st-prof-nohp" value="${escapeAttr(s.noHp || '')}" placeholder="cth. 081234567890" style="width:100%;">
+        <div class="helper-text">Digunakan untuk menerima bukti pembayaran dan notifikasi sekolah.</div>
+      </div>
+      <div class="form-group">
+        <label>PIN / Kata Sandi Login Siswa Baru</label>
+        <input type="password" id="st-prof-pin" value="${escapeAttr(s.pin || '')}" placeholder="Kosongkan jika tetap menggunakan NIS (${escapeAttr(s.nis || '')})" style="width:100%;">
+        <div class="helper-text">Ubah PIN agar akun Anda tidak dapat dibuka oleh orang lain yang mengetahui NIS Anda.</div>
+      </div>
+      <div class="form-group" style="margin-bottom:0;">
+        <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-weight:500; font-size:12.5px;">
+          <input type="checkbox" id="st-prof-show-pin" style="width:15px; height:15px;">
+          <span>Tampilkan karakter PIN</span>
+        </label>
+      </div>
+    </div>
+    <div class="modal-foot">
+      <button class="btn" id="modal-cancel">Batal</button>
+      <button class="btn btn-primary" id="btn-save-st-prof">Simpan Perubahan</button>
+    </div>
+  `);
+
+  document.getElementById('st-prof-show-pin')?.addEventListener('change', e => {
+    const pinIn = document.getElementById('st-prof-pin');
+    if (pinIn) pinIn.type = e.target.checked ? 'text' : 'password';
+  });
+
+  document.getElementById('btn-save-st-prof')?.addEventListener('click', () => {
+    const newNoHp = document.getElementById('st-prof-nohp').value.trim();
+    const newPin = document.getElementById('st-prof-pin').value.trim();
+    const target = store.state.siswa.find(x => x.id === s.id);
+    if (target) {
+      target.noHp = newNoHp;
+      target.pin = newPin;
+      saveData('Profil & PIN keamanan berhasil diperbarui');
+      closeModal();
+      triggerRender();
+    }
+  });
+}
 
 function iconMoney(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>`; }
 function iconUserCheck(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="9" cy="7" r="4"/><path d="M2 21v-2a4 4 0 014-4h6a4 4 0 014 4v2"/><path d="M16 11l2 2 4-4"/></svg>`; }
@@ -18,8 +73,17 @@ function renderTopTunggakan(){
     .sort((a,b)=>b.t.totalKurang-a.t.totalKurang)
     .slice(0,6);
   if(rows.length===0) return `<div class="empty-state" style="padding:24px;"><p>Semua siswa lunas sampai bulan berjalan. Kerja bagus, Bu/Pak Bendahara. 🎉</p></div>`;
-  return `<div class="table-scroll"><table><thead><tr><th>Nama</th><th>Kelas</th><th class="num">Bulan Tertunggak</th><th class="num">Kekurangan</th></tr></thead><tbody>
-    ${rows.map(r=>`<tr><td>${escapeHtml(r.s.nama)}</td><td><span class="kelas-chip">${escapeHtml(r.s.kelas)}</span></td><td class="num">${r.t.jumlahBulan}</td><td class="num">${fmtRupiah(r.t.totalKurang)}</td></tr>`).join('')}
+  return `<div class="table-scroll"><table><thead><tr><th>Nama</th><th>Kelas</th><th class="num">Bulan Tertunggak</th><th class="num">Kekurangan</th><th style="width:120px; text-align:right;">Aksi</th></tr></thead><tbody>
+    ${rows.map(r=>`<tr>
+      <td><strong>${escapeHtml(r.s.nama)}</strong></td>
+      <td><span class="kelas-chip">${escapeHtml(r.s.kelas)}</span></td>
+      <td class="num">${r.t.jumlahBulan}</td>
+      <td class="num">${fmtRupiah(r.t.totalKurang)}</td>
+      <td style="text-align:right; white-space:nowrap;">
+        ${r.s.noHp ? `<button class="btn btn-sm btn-ghost" style="color:#25D366;" data-dash-wa="${r.s.id}" title="Kirim Pengingat WA"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="15" height="15"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg></button>` : ''}
+        <button class="btn btn-sm btn-secondary" data-dash-bayar="${r.s.id}" title="Catat Pembayaran SPP">Bayar</button>
+      </td>
+    </tr>`).join('')}
   </tbody></table></div>`;
 }
 
@@ -177,6 +241,16 @@ export async function renderDashboard(){
             <div class="at-desc">Hubungi bendahara sekolah</div>
           </div>
         </a>
+
+        <div class="action-tile-btn" id="shortcut-profil-pin">
+          <div class="at-icon" style="background:rgba(245,158,11,0.12); color:#D97706;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:20px;height:20px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </div>
+          <div>
+            <div class="at-label">Profil & Ubah PIN</div>
+            <div class="at-desc">${s.pin ? 'PIN kustom aktif' : 'Masih memakai PIN standar'}</div>
+          </div>
+        </div>
       </div>
 
       <!-- SPP & Ijazah Progress Cards -->
@@ -184,7 +258,7 @@ export async function renderDashboard(){
         <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:6px;">
           <div>
             <h3 style="margin:0; font-size:16px;">Progres Pelunasan SPP</h3>
-            <div class="card-sub" style="margin-top:2px;">Target pembayaran 12 bulan (Tahun Ajaran ${escapeHtml(tahunAjaran)})</div>
+            <div class="card-sub" style="margin-top:2px;">Target pembayaran 12 bulan (Tahun Ajaran ${getActiveTahunMulai()}/${getActiveTahunMulai()+1})</div>
           </div>
           <span class="badge ${progressPercent >= 100 ? 'lunas' : progressPercent > 0 ? 'parsial' : 'nunggak'}">
             ${progressPercent >= 100 ? 'Lunas 100%' : `${lunasCount} / 12 Bulan`}
@@ -222,21 +296,40 @@ export async function renderDashboard(){
         </div>
       </div>
       
-      <!-- Financial Summary Cards -->
-      <div class="stat-row">
-        <div class="stat-card ${tunggakan.jumlahBulan > 0 ? 'rust' : 'gold'}">
-          <div class="stat-icon">${iconAlertTri()}</div>
-          <div class="label">Bulan Menunggak</div>
-          <div class="value">${tunggakan.jumlahBulan === 0 ? 'Nihil (Lunas)' : tunggakan.jumlahBulan + ' Bulan'}</div>
-          <div class="foot">Perhitungan hingga bulan berjalan</div>
-        </div>
-        <div class="stat-card ${tunggakan.totalKurang > 0 ? 'rust' : 'gold'}">
-          <div class="stat-icon">${iconWallet()}</div>
-          <div class="label">Kekurangan SPP</div>
-          <div class="value">${fmtRupiah(tunggakan.totalKurang)}</div>
-          <div class="foot">Total tagihan SPP jatuh tempo</div>
-        </div>
-      </div>
+      <!-- Financial Summary Cards (4 Balanced Columns) -->
+      ${(() => {
+        const curBulanEntry = currentPeriodeEntry();
+        const stBulanIni = siswaStatusBulan(s.id, curBulanEntry.bulan, curBulanEntry.tahun);
+        const sisaIjazah = Math.max(0, nominalIjazah - ijazahTerbayar);
+        return `
+          <div class="stat-row">
+            <div class="stat-card ${stBulanIni === 'lunas' ? 'emerald' : stBulanIni === 'parsial' ? 'amber' : 'rust'}">
+              <div class="stat-icon">${iconMoney()}</div>
+              <div class="label">SPP ${BULAN[curBulanEntry.bulan-1]} ${curBulanEntry.tahun}</div>
+              <div class="value">${stBulanIni === 'lunas' ? 'Lunas' : stBulanIni === 'parsial' ? 'Sebagian' : 'Belum Bayar'}</div>
+              <div class="foot">Status bulan berjalan</div>
+            </div>
+            <div class="stat-card ${tunggakan.jumlahBulan > 0 ? 'rust' : 'gold'}">
+              <div class="stat-icon">${iconAlertTri()}</div>
+              <div class="label">Bulan Menunggak</div>
+              <div class="value">${tunggakan.jumlahBulan === 0 ? 'Nihil (Lunas)' : tunggakan.jumlahBulan + ' Bulan'}</div>
+              <div class="foot">Perhitungan hingga bulan ini</div>
+            </div>
+            <div class="stat-card ${tunggakan.totalKurang > 0 ? 'rust' : 'gold'}">
+              <div class="stat-icon">${iconWallet()}</div>
+              <div class="label">Kekurangan SPP</div>
+              <div class="value">${fmtRupiah(tunggakan.totalKurang)}</div>
+              <div class="foot">Total tagihan SPP jatuh tempo</div>
+            </div>
+            <div class="stat-card ${sisaIjazah === 0 ? 'emerald' : 'blue'}">
+              <div class="stat-icon">${iconUserCheck()}</div>
+              <div class="label">Sisa Tagihan Ijazah</div>
+              <div class="value">${sisaIjazah === 0 ? 'Lunas' : fmtRupiah(sisaIjazah)}</div>
+              <div class="foot">Terbayar ${ijazahPercent}% dari ketetapan</div>
+            </div>
+          </div>
+        `;
+      })()}
     `;
 
     // Events
@@ -253,6 +346,10 @@ export async function renderDashboard(){
     document.getElementById('shortcut-riwayat')?.addEventListener('click', () => {
       store.ui.page = 'riwayat';
       triggerRender();
+    });
+
+    document.getElementById('shortcut-profil-pin')?.addEventListener('click', () => {
+      openStudentProfileModal(s);
     });
 
     document.getElementById('shortcut-wa-bendahara')?.addEventListener('click', (e) => {
@@ -278,9 +375,14 @@ export async function renderDashboard(){
           </div>
         </div>
         <div class="modal-foot">
-          <button class="btn btn-primary" id="modal-cancel" style="width:100%;">Tutup</button>
+          <button class="btn" id="modal-cancel">Tutup</button>
+          <button class="btn btn-primary" id="btn-hero-dl-qr">Simpan Kartu PNG</button>
         </div>
       `);
+      document.getElementById('btn-hero-dl-qr')?.addEventListener('click', async () => {
+        await downloadStudentQrCardPng(s);
+        toast('Kartu QR berhasil disimpan sebagai gambar PNG', 'success');
+      });
     });
 
     return;
@@ -315,6 +417,7 @@ export async function renderDashboard(){
   }
   const totals = months.map(m => store.state.pembayaran.filter(p=>(!p.jenis || p.jenis==='spp') && p.bulan===m.bulan && p.tahun===m.tahun).reduce((a,p)=>a+p.nominal,0));
   const maxTotal = Math.max(...totals, 1);
+  const absenStatsToday = getStatistikAbsensi(getTodayDateStr());
 
   if(totalSiswa===0){
     el.innerHTML = emptyState(iconEmptyUsers(), 'Belum ada data siswa', 'Tambahkan data siswa terlebih dahulu di menu Data Siswa untuk mulai mencatat pembayaran SPP.', 'Tambah Data Siswa', () => {
@@ -365,6 +468,35 @@ export async function renderDashboard(){
         <div class="label">Total Piutang Berjalan</div>
         <div class="value">${fmtRupiah(totalPiutang)}</div>
         <div class="foot">Akumulasi tunggakan SPP</div>
+      </div>
+    </div>
+
+    <!-- Ringkasan Kehadiran Hari Ini -->
+    <div class="card" style="margin-bottom:24px; padding:16px 20px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:12px;">
+        <div>
+          <h3 style="margin:0; font-size:15.5px;">Ringkasan Presensi Siswa Hari Ini</h3>
+          <div class="card-sub">${new Date().toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}</div>
+        </div>
+        <button class="btn btn-sm btn-secondary" id="btn-dash-rekap-absen">Kelola Rekap Presensi &rarr;</button>
+      </div>
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:10px;">
+        <div style="background:var(--paper-dim); border:1px solid var(--line); border-radius:10px; padding:10px 14px;">
+          <div style="font-size:11px; color:var(--ink-soft); text-transform:uppercase; font-weight:600;">Hadir Tepat Waktu</div>
+          <div style="font-size:20px; font-weight:800; color:#10B981; font-family:'IBM Plex Mono',monospace; margin-top:2px;">${absenStatsToday.hadir} <span style="font-size:12px; font-weight:500; color:var(--ink-soft);">Siswa</span></div>
+        </div>
+        <div style="background:var(--paper-dim); border:1px solid var(--line); border-radius:10px; padding:10px 14px;">
+          <div style="font-size:11px; color:var(--ink-soft); text-transform:uppercase; font-weight:600;">Terlambat</div>
+          <div style="font-size:20px; font-weight:800; color:#D97706; font-family:'IBM Plex Mono',monospace; margin-top:2px;">${absenStatsToday.terlambat} <span style="font-size:12px; font-weight:500; color:var(--ink-soft);">Siswa</span></div>
+        </div>
+        <div style="background:var(--paper-dim); border:1px solid var(--line); border-radius:10px; padding:10px 14px;">
+          <div style="font-size:11px; color:var(--ink-soft); text-transform:uppercase; font-weight:600;">Izin / Sakit</div>
+          <div style="font-size:20px; font-weight:800; color:#3B82F6; font-family:'IBM Plex Mono',monospace; margin-top:2px;">${absenStatsToday.izin + absenStatsToday.sakit} <span style="font-size:12px; font-weight:500; color:var(--ink-soft);">Siswa</span></div>
+        </div>
+        <div style="background:var(--paper-dim); border:1px solid var(--line); border-radius:10px; padding:10px 14px;">
+          <div style="font-size:11px; color:var(--ink-soft); text-transform:uppercase; font-weight:600;">Belum Hadir / Alpa</div>
+          <div style="font-size:20px; font-weight:800; color:var(--ink); font-family:'IBM Plex Mono',monospace; margin-top:2px;">${absenStatsToday.belumHadir + absenStatsToday.alpa} <span style="font-size:12px; font-weight:500; color:var(--ink-soft);">Siswa</span></div>
+        </div>
       </div>
     </div>
 
@@ -429,5 +561,30 @@ export async function renderDashboard(){
   document.getElementById('btn-semua-riwayat')?.addEventListener('click', () => {
     store.ui.page = 'riwayat';
     triggerRender();
+  });
+  document.getElementById('btn-dash-rekap-absen')?.addEventListener('click', () => {
+    store.ui.absensiTab = 'rekap';
+    store.ui.page = 'absensi';
+    triggerRender();
+  });
+  el.querySelectorAll('[data-dash-bayar]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      store.ui.bayarSiswaId = btn.dataset.dashBayar;
+      store.ui.bayarJenis = 'spp';
+      store.ui.bayarSelectedMonths = [];
+      store.ui.page = 'bayar';
+      triggerRender();
+    });
+  });
+  el.querySelectorAll('[data-dash-wa]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const id = btn.dataset.dashWa;
+      const s = store.state.siswa.find(x => x.id === id);
+      if (!s) return;
+      const t = siswaTunggakan(id);
+      const bulanTeks = t.bulanBelum.map(m => `- ${BULAN[m.bulan-1]} ${m.tahun} (Kurang: ${fmtRupiah(m.kurang)})`).join('\n');
+      const teks = `Halo Bapak/Ibu,\n\nKami menginformasikan bahwa terdapat tunggakan pembayaran SPP atas nama *${s.nama}* (Kelas ${s.kelas}).\n\nRincian Tunggakan:\n${bulanTeks}\n\n*Total Tunggakan: ${fmtRupiah(t.totalKurang)}*\n\nMohon untuk segera melakukan pembayaran. Jika sudah membayar, abaikan pesan ini.\n\nTerima kasih,\nBendahara ${store.state.settings.namaSekolah}`;
+      window.open(formatWaLink(s.noHp, teks), '_blank');
+    });
   });
 }

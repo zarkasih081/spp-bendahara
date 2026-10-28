@@ -1,6 +1,7 @@
 import { store } from '../../app/state.js';
 import { currentPeriodeEntry, siswaStatusBulan, toast } from '../../utils/helpers.js';
 import { escapeHtml, escapeAttr } from '../../utils/formatters.js';
+import { triggerRender } from '../../utils/events.js';
 import { openModal, closeModal, openConfirm } from '../../components/Modal.js';
 import { handleImportExcel, downloadSiswaTemplate } from './siswaImport.js';
 import { getSiswaById, addSiswa, updateSiswa, deleteSiswa, bulkDeleteSiswa, promoteSiswa, validateSiswa } from './siswaService.js';
@@ -33,6 +34,7 @@ export function renderSiswa(){
       <div class="toolbar-right" style="gap:8px;">
         <button class="btn btn-danger" id="btn-bulk-delete" style="display:none; padding:8px 12px;" title="Hapus Terpilih"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="margin:0;"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
         <button class="btn btn-secondary" id="btn-bulk-promote" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><polyline points="13 17 18 12 13 7"></polyline><line x1="6" y1="12" x2="18" y2="12"></line></svg> Naik Kelas</button>
+        <button class="btn btn-secondary" id="btn-bulk-print-qr" style="display:none;"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg> Cetak Kartu</button>
         <div style="width:1px; background:var(--line); margin: 0 4px; display:none;" id="bulk-divider"></div>
         <button class="btn" id="btn-download-template" title="Download Format Excel Kosong"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="7 10 12 15 17 10"></polyline><line x1="12" y1="15" x2="12" y2="3"></line></svg></button>
         <button class="btn" id="btn-import"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg> Import Excel</button>
@@ -45,7 +47,7 @@ export function renderSiswa(){
           <thead>
             <tr>
               <th style="width:40px; text-align:center;"><input type="checkbox" id="siswa-select-all"></th>
-              <th>Nama</th><th>Kelas</th><th>NIS</th><th>No. WA</th><th class="num">SPP Bulan Ini</th><th style="width:90px;"></th>
+              <th>Nama</th><th>Kelas</th><th>NIS</th><th>No. WA</th><th class="num">SPP Bulan Ini</th><th style="width:130px; text-align:right;">Aksi</th>
             </tr>
           </thead>
           <tbody id="siswa-tbody"></tbody>
@@ -75,7 +77,8 @@ export function renderSiswa(){
         <td>${escapeHtml(s.nis||'-')}</td>
         <td>${escapeHtml(s.noHp||'-')}</td>
         <td class="num"><span class="badge ${st}">${st==='lunas'?'Lunas':st==='parsial'?'Sebagian':'Belum'}</span></td>
-        <td>
+        <td style="text-align:right; white-space:nowrap;">
+          <button class="btn btn-sm btn-ghost" data-bayar-siswa="${s.id}" title="Input Pembayaran SPP"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:14px;height:14px;"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></button>
           <button class="btn btn-sm btn-ghost" data-qr-siswa="${s.id}" title="Kartu QR Siswa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" style="width:14px;height:14px;"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/></svg></button>
           <button class="btn btn-sm btn-ghost" data-edit-siswa="${s.id}" title="Ubah Siswa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 20h4L18 10l-4-4L4 16v4z"/></svg></button>
           <button class="btn btn-sm btn-ghost" data-del-siswa="${s.id}" title="Hapus Siswa"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg></button>
@@ -107,6 +110,12 @@ export function renderSiswa(){
   document.getElementById('siswa-kelas-filter').addEventListener('change', e=>{ store.ui.siswaKelasFilter = e.target.value; store.ui.pageSiswa=1; renderSiswa(); });
   document.getElementById('btn-add-siswa').addEventListener('click', ()=>openSiswaModal());
   document.getElementById('btn-import').addEventListener('click', ()=>document.getElementById('import-file-input').click());
+  tbody.querySelectorAll('[data-bayar-siswa]').forEach(b=>b.addEventListener('click', ()=>{
+    store.ui.bayarSiswaId = b.dataset.bayarSiswa;
+    store.ui.bayarSelectedMonths = [];
+    store.ui.page = 'bayar';
+    triggerRender();
+  }));
   tbody.querySelectorAll('[data-edit-siswa]').forEach(b=>b.addEventListener('click', ()=>openSiswaModal(b.dataset.editSiswa)));
   
   tbody.querySelectorAll('[data-qr-siswa]').forEach(b=>b.addEventListener('click', async ()=>{
@@ -142,6 +151,7 @@ export function renderSiswa(){
     if(s) {
       openConfirm(`Hapus data "${s.nama}"? Riwayat pembayarannya juga akan dihapus.`, ()=>{
         deleteSiswa(id);
+        selectedSiswaIds.delete(id);
         renderSiswa();
       });
     }
@@ -150,12 +160,14 @@ export function renderSiswa(){
   // Bulk Actions UI Update
   const btnBulkDelete = document.getElementById('btn-bulk-delete');
   const btnBulkPromote = document.getElementById('btn-bulk-promote');
+  const btnBulkPrintQr = document.getElementById('btn-bulk-print-qr');
   const bulkDivider = document.getElementById('bulk-divider');
   
   const updateBulkUI = () => {
     const hasSelection = selectedSiswaIds.size > 0;
     btnBulkDelete.style.display = hasSelection ? 'inline-flex' : 'none';
     btnBulkPromote.style.display = hasSelection ? 'inline-flex' : 'none';
+    if (btnBulkPrintQr) btnBulkPrintQr.style.display = hasSelection ? 'inline-flex' : 'none';
     bulkDivider.style.display = hasSelection ? 'block' : 'none';
   };
   
@@ -198,6 +210,17 @@ export function renderSiswa(){
       selectedSiswaIds.clear();
       renderSiswa();
     });
+  });
+
+  btnBulkPrintQr?.addEventListener('click', async () => {
+    const selectedList = store.state.siswa.filter(s => selectedSiswaIds.has(s.id));
+    if (selectedList.length === 0) return;
+    const printArea = document.getElementById('kwitansi-print-area');
+    if (!printArea) return;
+    toast(`Menyiapkan cetak ${selectedList.length} kartu siswa...`, 'info');
+    const cardsHtml = await Promise.all(selectedList.map(s => renderStudentCardHtml(s)));
+    printArea.innerHTML = `<div class="print-cards-container ${selectedList.length === 1 ? 'single' : 'sheet'}">${cardsHtml.join('')}</div>`;
+    setTimeout(() => window.print(), 150);
   });
 
   btnBulkPromote.addEventListener('click', () => {
