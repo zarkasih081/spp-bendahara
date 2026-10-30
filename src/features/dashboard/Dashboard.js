@@ -6,41 +6,139 @@ import { triggerRender } from '../../utils/events.js';
 import { getTodayDateStr, formatTimeDisplay, getStatistikAbsensi } from '../absensi/absensiService.js';
 import { openModal, closeModal } from '../../components/Modal.js';
 import { renderStudentCardHtml, downloadStudentQrCardPng } from '../absensi/qrCardGenerator.js';
+import { cetakSuratBebasAdministrasi } from '../pembayaran/cetakDokumenSiswa.js';
 
 export function openStudentProfileModal(s) {
   if (!s) return;
   openModal(`
     <div class="modal-head">
-      <h3>Profil & Keamanan Akun Siswa</h3>
+      <div>
+        <h3 style="margin:0;">Lengkapi Profil & Biodata Siswa</h3>
+        <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">Data ini digunakan untuk pencetakan kartu pelajar, rapor, & administrasi sekolah.</div>
+      </div>
       <button class="close-x" id="modal-close">&times;</button>
     </div>
-    <div class="modal-body">
-      <div style="background:var(--paper-dim); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:16px;">
-        <div style="font-size:15px; font-weight:700; color:var(--ink);">${escapeHtml(s.nama)}</div>
-        <div style="font-size:12.5px; color:var(--ink-soft); margin-top:2px;">NIS: <strong class="monospace">${escapeHtml(s.nis || '-')}</strong> • Kelas: <strong>${escapeHtml(s.kelas)}</strong></div>
+    <div class="modal-body" style="max-height:72vh; overflow-y:auto; padding-right:6px;">
+      <!-- Identitas Utama Readonly -->
+      <div style="background:var(--paper-dim); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <div>
+          <div style="font-size:15px; font-weight:700; color:var(--ink);">${escapeHtml(s.nama)}</div>
+          <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">
+            NIS: <strong class="monospace" style="color:var(--primary);">${escapeHtml(s.nis || '-')}</strong> • Kelas: <strong>${escapeHtml(s.kelas)}</strong>
+          </div>
+        </div>
+        <div>
+          <span class="badge ${s.rfidUid ? 'lunas' : ''}" style="font-size:11px;">
+            ${s.rfidUid ? `💳 RFID: ${escapeHtml(s.rfidUid)}` : '💳 Kartu RFID Belum Terdaftar'}
+          </span>
+        </div>
       </div>
-      <div class="form-group">
-        <label>No. WhatsApp Orang Tua / Siswa</label>
-        <input type="text" id="st-prof-nohp" value="${escapeAttr(s.noHp || '')}" placeholder="cth. 081234567890" style="width:100%;">
-        <div class="helper-text">Digunakan untuk menerima bukti pembayaran dan notifikasi sekolah.</div>
+
+      <!-- Tab Navigasi Form Profil -->
+      <div class="tabs" style="margin-bottom:14px; padding:3px;">
+        <button type="button" class="tab-btn active" id="tab-btn-bio" style="font-size:12.5px; padding:6px 12px;">👤 Data Diri</button>
+        <button type="button" class="tab-btn" id="tab-btn-wali" style="font-size:12.5px; padding:6px 12px;">🏡 Orang Tua & Alamat</button>
+        <button type="button" class="tab-btn" id="tab-btn-sec" style="font-size:12.5px; padding:6px 12px;">🔒 Keamanan (PIN)</button>
       </div>
-      <div class="form-group">
-        <label>PIN / Kata Sandi Login Siswa Baru</label>
-        <input type="password" id="st-prof-pin" value="${escapeAttr(s.pin || '')}" placeholder="Kosongkan jika tetap menggunakan NIS (${escapeAttr(s.nis || '')})" style="width:100%;">
-        <div class="helper-text">Ubah PIN agar akun Anda tidak dapat dibuka oleh orang lain yang mengetahui NIS Anda.</div>
+
+      <!-- Section 1: Data Diri Siswa -->
+      <div id="section-bio" class="st-prof-section">
+        <div class="form-row">
+          <div class="form-group">
+            <label>NISN (10 Digit Angka)</label>
+            <input type="text" id="st-prof-nisn" class="monospace" maxlength="10" value="${escapeAttr(s.nisn || '')}" placeholder="Contoh: 0081234567" style="width:100%;">
+            <div class="helper-text">Nomor Induk Siswa Nasional dari Kemdikbud/Kemenag.</div>
+          </div>
+          <div class="form-group">
+            <label>NIK Siswa (16 Digit)</label>
+            <input type="text" id="st-prof-nik" class="monospace" maxlength="16" value="${escapeAttr(s.nik || '')}" placeholder="Contoh: 320701..." style="width:100%;">
+            <div class="helper-text">Nomor Induk Kependudukan sesuai Kartu Keluarga (KK).</div>
+          </div>
+        </div>
+
+        <div class="form-row">
+          <div class="form-group">
+            <label>Tempat Lahir</label>
+            <input type="text" id="st-prof-tempat-lahir" value="${escapeAttr(s.tempatLahir || '')}" placeholder="Contoh: Ciamis" style="width:100%;">
+          </div>
+          <div class="form-group">
+            <label>Tanggal Lahir</label>
+            <input type="date" id="st-prof-tgl-lahir" value="${escapeAttr(s.tanggalLahir || '')}" style="width:100%;">
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label>Jenis Kelamin</label>
+          <select id="st-prof-jk" style="width:100%;">
+            <option value="">-- Pilih Jenis Kelamin --</option>
+            <option value="L" ${s.jenisKelamin === 'L' ? 'selected' : ''}>Laki-laki</option>
+            <option value="P" ${s.jenisKelamin === 'P' ? 'selected' : ''}>Perempuan</option>
+          </select>
+        </div>
       </div>
-      <div class="form-group" style="margin-bottom:0;">
-        <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-weight:500; font-size:12.5px;">
-          <input type="checkbox" id="st-prof-show-pin" style="width:15px; height:15px;">
-          <span>Tampilkan karakter PIN</span>
-        </label>
+
+      <!-- Section 2: Orang Tua / Wali & Kontak -->
+      <div id="section-wali" class="st-prof-section" style="display:none;">
+        <div class="form-group">
+          <label>Nama Lengkap Orang Tua / Wali</label>
+          <input type="text" id="st-prof-wali" value="${escapeAttr(s.namaWali || '')}" placeholder="Nama Ayah / Ibu / Wali Siswa" style="width:100%;">
+          <div class="helper-text">Dicantumkan pada kartu administrasi dan surat keterangan sekolah.</div>
+        </div>
+
+        <div class="form-group">
+          <label>No. WhatsApp Orang Tua / Siswa</label>
+          <input type="tel" id="st-prof-nohp" value="${escapeAttr(s.noHp || '')}" placeholder="Contoh: 081234567890" style="width:100%;">
+          <div class="helper-text">Untuk menerima pemberitahuan resmi kwitansi dan presensi sekolah.</div>
+        </div>
+
+        <div class="form-group">
+          <label>Alamat Lengkap Tempat Tinggal</label>
+          <textarea id="st-prof-alamat" rows="2" placeholder="Dusun / Jalan, RT/RW, Desa/Kelurahan, Kecamatan..." style="width:100%;">${escapeHtml(s.alamat || '')}</textarea>
+        </div>
+      </div>
+
+      <!-- Section 3: Keamanan & PIN Login -->
+      <div id="section-sec" class="st-prof-section" style="display:none;">
+        <div class="form-group">
+          <label>PIN / Kata Sandi Login Siswa</label>
+          <input type="password" id="st-prof-pin" value="${escapeAttr(s.pin || '')}" placeholder="Kosongkan jika ingin tetap memakai NIS (${escapeAttr(s.nis || '')})" style="width:100%;">
+          <div class="helper-text">Gunakan 4–6 digit angka/huruf rahasia agar akun Anda tidak dapat diakses orang lain.</div>
+        </div>
+        <div class="form-group" style="margin-bottom:0;">
+          <label style="display:inline-flex; align-items:center; gap:8px; cursor:pointer; font-weight:500; font-size:12.5px;">
+            <input type="checkbox" id="st-prof-show-pin" style="width:15px; height:15px;">
+            <span>Tampilkan karakter PIN</span>
+          </label>
+        </div>
       </div>
     </div>
     <div class="modal-foot">
       <button class="btn" id="modal-cancel">Batal</button>
-      <button class="btn btn-primary" id="btn-save-st-prof">Simpan Perubahan</button>
+      <button class="btn btn-primary" id="btn-save-st-prof" style="display:inline-flex; align-items:center; gap:6px;">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        Simpan Profil Lengkap
+      </button>
     </div>
   `);
+
+  // Switch tabs
+  const tabBio = document.getElementById('tab-btn-bio');
+  const tabWali = document.getElementById('tab-btn-wali');
+  const tabSec = document.getElementById('tab-btn-sec');
+  const secBio = document.getElementById('section-bio');
+  const secWali = document.getElementById('section-wali');
+  const secSec = document.getElementById('section-sec');
+
+  const switchTab = (activeTab, activeSec) => {
+    [tabBio, tabWali, tabSec].forEach(t => t?.classList.remove('active'));
+    [secBio, secWali, secSec].forEach(s => { if (s) s.style.display = 'none'; });
+    activeTab?.classList.add('active');
+    if (activeSec) activeSec.style.display = 'block';
+  };
+
+  tabBio?.addEventListener('click', () => switchTab(tabBio, secBio));
+  tabWali?.addEventListener('click', () => switchTab(tabWali, secWali));
+  tabSec?.addEventListener('click', () => switchTab(tabSec, secSec));
 
   document.getElementById('st-prof-show-pin')?.addEventListener('change', e => {
     const pinIn = document.getElementById('st-prof-pin');
@@ -48,13 +146,20 @@ export function openStudentProfileModal(s) {
   });
 
   document.getElementById('btn-save-st-prof')?.addEventListener('click', () => {
-    const newNoHp = document.getElementById('st-prof-nohp').value.trim();
-    const newPin = document.getElementById('st-prof-pin').value.trim();
     const target = store.state.siswa.find(x => x.id === s.id);
     if (target) {
-      target.noHp = newNoHp;
-      target.pin = newPin;
-      saveData('Profil & PIN keamanan berhasil diperbarui');
+      target.nisn = document.getElementById('st-prof-nisn')?.value.trim() || '';
+      target.nik = document.getElementById('st-prof-nik')?.value.trim() || '';
+      target.tempatLahir = document.getElementById('st-prof-tempat-lahir')?.value.trim() || '';
+      target.tanggalLahir = document.getElementById('st-prof-tgl-lahir')?.value || '';
+      target.jenisKelamin = document.getElementById('st-prof-jk')?.value || '';
+      target.namaWali = document.getElementById('st-prof-wali')?.value.trim() || '';
+      target.noHp = document.getElementById('st-prof-nohp')?.value.trim() || '';
+      target.alamat = document.getElementById('st-prof-alamat')?.value.trim() || '';
+      target.pin = document.getElementById('st-prof-pin')?.value.trim() || '';
+
+      saveData('Data profil siswa berhasil disimpan & diperbarui');
+      toast('Profil siswa berhasil diperbarui', 'success');
       closeModal();
       triggerRender();
     }
@@ -111,6 +216,9 @@ export async function renderDashboard(){
     const ijazahPercent = Math.min(100, Math.round((ijazahTerbayar / nominalIjazah) * 100));
 
     const totalTerbayarSpp = store.state.pembayaran.filter(p => p.siswaId === s.id && (!p.jenis || p.jenis === 'spp')).reduce((sum, p) => sum + p.nominal, 0);
+
+    const isProfileComplete = Boolean(s.nisn && s.namaWali && s.alamat);
+    const isSemuaLunas = progressPercent >= 100 && ijazahPercent >= 100;
 
     const today = getTodayDateStr();
     const todayRecord = (store.state.absensi || []).find(a => a.siswaId === s.id && a.tanggal === today);
@@ -170,7 +278,9 @@ export async function renderDashboard(){
           <div class="sp-student-name">${escapeHtml(s.nama)}</div>
           <div class="sp-student-meta-row">
             <span class="sp-pill">NIS: ${escapeHtml(s.nis || 'Belum Diatur')}</span>
+            ${s.nisn ? `<span class="sp-pill monospace">NISN: ${escapeHtml(s.nisn)}</span>` : ''}
             <span class="sp-pill">Kelas ${escapeHtml(s.kelas)}</span>
+            <span class="sp-pill ${s.rfidUid ? 'active-status' : ''}">${s.rfidUid ? `💳 RFID: ${escapeHtml(s.rfidUid)}` : '💳 QR Ready'}</span>
             <span class="sp-pill active-status">✓ Siswa Aktif</span>
             <span class="sp-pill" style="opacity:0.85;">TA ${escapeHtml(tahunAjaran)}</span>
           </div>
@@ -190,6 +300,45 @@ export async function renderDashboard(){
         </div>
       </div>
 
+      <!-- Banner Kelengkapan Data Profil Siswa -->
+      ${!isProfileComplete ? `
+        <div class="card" style="background:rgba(245,158,11,0.07); border:1.5px solid rgba(245,158,11,0.3); border-radius:12px; margin-bottom:16px; padding:12px 16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:36px; height:36px; border-radius:50%; background:rgba(245,158,11,0.18); display:flex; align-items:center; justify-content:center; color:#D97706; flex-shrink:0;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><path d="M12 9v4M12 17h.01"/><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+            </div>
+            <div>
+              <div style="font-weight:700; font-size:13.5px; color:#B45309;">Lengkapi Data Profil & Orang Tua</div>
+              <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">
+                ${!s.nisn ? 'NISN' : ''}${!s.namaWali ? (!s.nisn ? ', Nama Orang Tua' : 'Nama Orang Tua') : ''}${!s.alamat ? ', Alamat Lengkap' : ''} belum diisi. Lengkapi untuk penerbitan berkas resmi.
+              </div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm btn-primary" id="btn-banner-complete-profile" style="background:#D97706; border-color:#D97706;">
+            Lengkapi Profil &rarr;
+          </button>
+        </div>
+      ` : ''}
+
+      <!-- Banner Bebas Administrasi 100% Lunas -->
+      ${isSemuaLunas ? `
+        <div class="card" style="background:linear-gradient(135deg, rgba(16,185,129,0.08), rgba(6,182,212,0.08)); border:1.5px solid #10B981; border-radius:12px; margin-bottom:16px; padding:14px 18px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px;">
+          <div style="display:flex; align-items:center; gap:12px;">
+            <div style="width:38px; height:38px; border-radius:50%; background:#10B981; display:flex; align-items:center; justify-content:center; color:#fff; flex-shrink:0; box-shadow:0 3px 10px rgba(16,185,129,0.3);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="width:20px;height:20px;"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            <div>
+              <div style="font-weight:800; font-size:14.5px; color:#065F46;">Alhamdulillah! Semua Kewajiban Administrasi Lunas (100%)</div>
+              <div style="font-size:12px; color:#047857; margin-top:2px;">Anda telah menyelesaikan SPP 12 Bulan & Administrasi Ijazah. Surat Keterangan Bebas Keuangan dapat dicetak.</div>
+            </div>
+          </div>
+          <button type="button" class="btn btn-sm btn-primary" id="btn-cetak-surat-bebas" style="background:#059669; border-color:#059669; display:inline-flex; align-items:center; gap:6px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+            <span>Cetak Surat Keterangan Lunas</span>
+          </button>
+        </div>
+      ` : ''}
+
       <!-- Realtime Attendance Banner -->
       <div class="student-attendance-banner ${absenClass}" id="widget-kehadiran-siswa" title="Klik untuk membuka log presensi detail">
         <div class="sab-left">
@@ -200,6 +349,12 @@ export async function renderDashboard(){
             <div class="sab-eyebrow">Status Presensi Hari Ini • ${new Date().toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'short' })}</div>
             <div class="sab-title">${absenTitle}</div>
             <div style="font-size:12.5px; color:var(--ink-soft); margin-top:2px;">${absenSub}</div>
+            ${todayRecord && (todayRecord.jamDuha || todayRecord.jamDzuhur) ? `
+              <div style="display:flex; gap:8px; margin-top:6px; flex-wrap:wrap;">
+                ${todayRecord.jamDuha ? `<span class="badge" style="background:#FEF3C7; color:#92400E; font-size:11px;">☀️ Solat Duha: ${formatTimeDisplay(todayRecord.jamDuha)}</span>` : ''}
+                ${todayRecord.jamDzuhur ? `<span class="badge" style="background:#DBEAFE; color:#1E40AF; font-size:11px;">🕌 Solat Dzuhur: ${formatTimeDisplay(todayRecord.jamDzuhur)}</span>` : ''}
+              </div>
+            ` : ''}
           </div>
         </div>
         <div style="display:flex; align-items:center; gap:12px;">
@@ -350,6 +505,14 @@ export async function renderDashboard(){
 
     document.getElementById('shortcut-profil-pin')?.addEventListener('click', () => {
       openStudentProfileModal(s);
+    });
+
+    document.getElementById('btn-banner-complete-profile')?.addEventListener('click', () => {
+      openStudentProfileModal(s);
+    });
+
+    document.getElementById('btn-cetak-surat-bebas')?.addEventListener('click', () => {
+      cetakSuratBebasAdministrasi(s);
     });
 
     document.getElementById('shortcut-wa-bendahara')?.addEventListener('click', (e) => {

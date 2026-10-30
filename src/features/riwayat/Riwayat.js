@@ -4,6 +4,7 @@ import { escapeHtml, escapeAttr, fmtRupiah, formatWaLink } from '../../utils/for
 import { triggerRender } from '../../utils/events.js';
 import { openModal, closeModal } from '../../components/Modal.js';
 import { cetakKwitansi } from '../pembayaran/kwitansi.js';
+import { cetakKartuSppTahunan } from '../pembayaran/cetakDokumenSiswa.js';
 import { parseLocalDate } from '../absensi/absensiService.js';
 
 export function renderRiwayat(){
@@ -50,6 +51,10 @@ export function renderRiwayat(){
             <select id="siswa-riwayat-ta" style="font-size:12.5px; padding:6px 10px;">
               ${taOptions.map(y => `<option value="${y}" ${y === activeTaStart ? 'selected' : ''}>TA ${y}/${y+1}</option>`).join('')}
             </select>
+            <button type="button" class="btn btn-sm btn-outline" id="btn-siswa-cetak-kartu-spp" style="display:inline-flex; align-items:center; gap:5px;" title="Cetak Rekap Pembayaran 12 Bulan Resmi">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+              <span>Cetak Kartu SPP 1 Tahun</span>
+            </button>
             ${t.totalKurang > 0 ? `
               <button type="button" class="btn btn-sm" id="btn-siswa-wa-tagihan" style="background:#25D366; color:#fff; border-color:#25D366;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
@@ -132,6 +137,53 @@ export function renderRiwayat(){
           </div>
         </div>
       </div>
+
+      <!-- Informasi Rekening Resmi Pembayaran Sekolah -->
+      <div class="card" style="margin-top:18px; background:linear-gradient(135deg, rgba(67,56,202,0.04), rgba(59,130,246,0.06)); border:1.5px solid rgba(67,56,202,0.22); border-radius:12px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <div style="width:32px; height:32px; border-radius:8px; background:var(--primary); color:#fff; display:flex; align-items:center; justify-content:center;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+            </div>
+            <div>
+              <h3 style="margin:0; font-size:15px; color:var(--primary-strong);">Rekening Resmi Pembayaran Sekolah</h3>
+              <div class="card-sub" style="font-size:11.5px; margin-top:1px;">Gunakan rekening berikut untuk pembayaran transfer bank / m-Banking</div>
+            </div>
+          </div>
+          <span class="badge" style="background:rgba(67,56,202,0.12); color:var(--primary); font-weight:700;">Transfer Bank Resmi</span>
+        </div>
+
+        <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-bottom:12px;">
+          <div style="background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:12px 14px;">
+            <div style="font-size:11px; text-transform:uppercase; color:var(--ink-soft); font-weight:600;">Nama Bank</div>
+            <div style="font-size:15px; font-weight:800; color:var(--ink); margin-top:2px;">${escapeHtml(store.state.settings.namaBank || 'Bank BRI / BSI')}</div>
+          </div>
+          <div style="background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:12px 14px; display:flex; justify-content:space-between; align-items:center;">
+            <div>
+              <div style="font-size:11px; text-transform:uppercase; color:var(--ink-soft); font-weight:600;">Nomor Rekening</div>
+              <div style="font-size:16px; font-weight:800; font-family:'IBM Plex Mono', monospace; color:var(--primary); margin-top:2px;" id="val-no-rek">${escapeHtml(store.state.settings.noRekening || '0123-01-000000-50-0')}</div>
+            </div>
+            <button type="button" class="btn btn-sm btn-ghost" id="btn-copy-no-rek" style="padding:6px 10px;" title="Salin Nomor Rekening">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>Salin</span>
+            </button>
+          </div>
+          <div style="background:var(--paper); border:1px solid var(--line); border-radius:10px; padding:12px 14px;">
+            <div style="font-size:11px; text-transform:uppercase; color:var(--ink-soft); font-weight:600;">Atas Nama</div>
+            <div style="font-size:14.5px; font-weight:700; color:var(--ink); margin-top:2px;">${escapeHtml(store.state.settings.atasNamaRekening || 'Bendahara Madrasah')}</div>
+          </div>
+        </div>
+
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; padding-top:10px; border-top:1px dashed rgba(67,56,202,0.2);">
+          <div style="font-size:12px; color:var(--ink-soft);">
+            💡 <em>Catatan:</em> Cantumkan Nama <strong>${escapeHtml(s.nama)}</strong> (${escapeHtml(s.kelas)}) di berita transfer dan kirim bukti transfer ke bendahara.
+          </div>
+          <button type="button" class="btn btn-sm btn-primary" id="btn-konfirmasi-transfer-wa" style="background:#25D366; border-color:#25D366; display:inline-flex; align-items:center; gap:6px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            <span>Kirim Bukti Transfer WA</span>
+          </button>
+        </div>
+      </div>
       
       <!-- Riwayat Transaksi & Kwitansi -->
       <div class="card" style="margin-top:18px;">
@@ -179,6 +231,30 @@ export function renderRiwayat(){
     document.getElementById('siswa-riwayat-ta')?.addEventListener('change', e => {
       store.ui.activeTahunMulai = parseInt(e.target.value, 10);
       renderRiwayat();
+    });
+
+    document.getElementById('btn-siswa-cetak-kartu-spp')?.addEventListener('click', () => {
+      cetakKartuSppTahunan(s, store.ui.activeTahunMulai);
+    });
+
+    document.getElementById('btn-copy-no-rek')?.addEventListener('click', () => {
+      const rekText = (store.state.settings.noRekening || '0123-01-000000-50-0').replace(/\s+/g, '');
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(rekText);
+        toast('Nomor rekening berhasil disalin ke clipboard!', 'success');
+      } else {
+        toast(`Nomor Rekening: ${rekText}`, 'info');
+      }
+    });
+
+    document.getElementById('btn-konfirmasi-transfer-wa')?.addEventListener('click', () => {
+      const noHp = store.state.settings.noHpBendahara;
+      if (!noHp) {
+        toast('Nomor WhatsApp bendahara belum disetel oleh sekolah.', 'info');
+        return;
+      }
+      const pesan = `Halo Bendahara ${store.state.settings.namaSekolah},\n\nSaya ingin mengirimkan *Bukti Transfer Pembayaran*:\nNama Siswa : *${s.nama}*\nKelas      : *${s.kelas}*\nNIS        : *${s.nis || '-'}*\n\nMohon dicek dan dicatat ke sistem. Berikut lampiran struk transfernya. Terima kasih.`;
+      window.open(formatWaLink(noHp, pesan), '_blank');
     });
 
     document.getElementById('btn-siswa-wa-tagihan')?.addEventListener('click', () => {

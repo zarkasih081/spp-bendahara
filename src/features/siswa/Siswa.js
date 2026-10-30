@@ -269,6 +269,44 @@ function openSiswaModal(id){
           <input id="f-nis" style="width:100%;" value="${editing?escapeAttr(editing.nis||''):''}" placeholder="Nomor induk siswa">
         </div>
       </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>NISN (10 Digit)</label>
+          <input id="f-nisn" class="monospace" maxlength="10" style="width:100%;" value="${editing?escapeAttr(editing.nisn||''):''}" placeholder="cth. 0081234567">
+        </div>
+        <div class="form-group">
+          <label>NIK (16 Digit)</label>
+          <input id="f-nik" class="monospace" maxlength="16" style="width:100%;" value="${editing?escapeAttr(editing.nik||''):''}" placeholder="cth. 320701...">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tempat Lahir</label>
+          <input id="f-tempat-lahir" style="width:100%;" value="${editing?escapeAttr(editing.tempatLahir||''):''}" placeholder="cth. Ciamis">
+        </div>
+        <div class="form-group">
+          <label>Tanggal Lahir</label>
+          <input id="f-tgl-lahir" type="date" style="width:100%;" value="${editing?escapeAttr(editing.tanggalLahir||''):''}">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Jenis Kelamin</label>
+          <select id="f-jk" style="width:100%;">
+            <option value="">-- Pilih --</option>
+            <option value="L" ${editing && editing.jenisKelamin==='L'?'selected':''}>Laki-laki</option>
+            <option value="P" ${editing && editing.jenisKelamin==='P'?'selected':''}>Perempuan</option>
+          </select>
+        </div>
+        <div class="form-group">
+          <label>Nama Orang Tua / Wali</label>
+          <input id="f-wali" style="width:100%;" value="${editing?escapeAttr(editing.namaWali||''):''}" placeholder="Nama Ayah/Ibu/Wali">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Alamat Lengkap</label>
+        <input id="f-alamat" style="width:100%;" value="${editing?escapeAttr(editing.alamat||''):''}" placeholder="Dusun, RT/RW, Desa, Kecamatan">
+      </div>
       <div class="form-group">
         <label>No. HP / WA Orang Tua (opsional)</label>
         <input id="f-nohp" style="width:100%;" value="${editing?escapeAttr(editing.noHp||''):''}" placeholder="cth. 08123456789">
@@ -306,6 +344,13 @@ function openSiswaModal(id){
     const nama = inNama.value.trim();
     const kelas = inKelas.value.trim();
     const nis = inNis.value.trim();
+    const nisn = document.getElementById('f-nisn')?.value.trim() || '';
+    const nik = document.getElementById('f-nik')?.value.trim() || '';
+    const tempatLahir = document.getElementById('f-tempat-lahir')?.value.trim() || '';
+    const tanggalLahir = document.getElementById('f-tgl-lahir')?.value || '';
+    const jenisKelamin = document.getElementById('f-jk')?.value || '';
+    const namaWali = document.getElementById('f-wali')?.value.trim() || '';
+    const alamat = document.getElementById('f-alamat')?.value.trim() || '';
     const noHp = document.getElementById('f-nohp').value.trim();
     const pin = document.getElementById('f-pin').value.trim();
     const rfidUid = inRfid ? inRfid.value.trim() : '';
@@ -322,10 +367,12 @@ function openSiswaModal(id){
       return;
     }
 
+    const payload = { nama, kelas, nis, nisn, nik, tempatLahir, tanggalLahir, jenisKelamin, namaWali, alamat, noHp, pin, rfidUid };
+
     if(editing){
-      updateSiswa(editing.id, { nama, kelas, nis, noHp, pin, rfidUid });
+      updateSiswa(editing.id, payload);
     } else {
-      addSiswa({ nama, kelas, nis, noHp, pin, rfidUid });
+      addSiswa(payload);
     }
     closeModal(); renderSiswa();
   });

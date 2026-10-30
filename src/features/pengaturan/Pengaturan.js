@@ -23,6 +23,21 @@ export function renderPengaturan(){
         <input id="set-nohp-bendahara" style="width:100%;" value="${escapeAttr(s.noHpBendahara || '')}" placeholder="cth. 081234567890">
         <div class="helper-text">Digunakan untuk tombol konsultasi WhatsApp pada portal siswa.</div>
       </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nama Bank Sekolah</label>
+          <input id="set-bank-nama" style="width:100%;" value="${escapeAttr(s.namaBank || 'Bank BRI / BSI')}" placeholder="cth. Bank BRI / BSI / Mandiri">
+        </div>
+        <div class="form-group">
+          <label>No. Rekening Resmi</label>
+          <input id="set-bank-rek" class="monospace" style="width:100%;" value="${escapeAttr(s.noRekening || '0123-01-000000-50-0')}" placeholder="cth. 0123-01-000000-50-0">
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Atas Nama Rekening</label>
+        <input id="set-bank-an" style="width:100%;" value="${escapeAttr(s.atasNamaRekening || 'Bendahara Madrasah')}" placeholder="cth. MTs Yasta Bunter / Bendahara SPP">
+        <div class="helper-text">Ditampilkan di portal akun siswa sebagai panduan transfer pembayaran resmi.</div>
+      </div>
       <div class="form-group" style="margin-top: 14px;">
         <label>Kata Sandi (PIN) Bendahara Baru</label>
         <input id="set-admin-pass" type="password" style="width:100%;" placeholder="Kosongkan jika tidak diubah">
@@ -90,6 +105,9 @@ export function renderPengaturan(){
     s.namaSekolah = document.getElementById('set-nama').value.trim() || s.namaSekolah;
     s.bendahara = document.getElementById('set-bendahara').value.trim();
     s.noHpBendahara = document.getElementById('set-nohp-bendahara').value.trim();
+    s.namaBank = document.getElementById('set-bank-nama')?.value.trim() || s.namaBank || 'Bank BRI / BSI';
+    s.noRekening = document.getElementById('set-bank-rek')?.value.trim() || s.noRekening || '';
+    s.atasNamaRekening = document.getElementById('set-bank-an')?.value.trim() || s.atasNamaRekening || '';
     s.tahunAjaran = document.getElementById('set-ta').value.trim() || s.tahunAjaran;
     
     const newPass = document.getElementById('set-admin-pass').value.trim();

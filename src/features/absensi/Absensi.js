@@ -643,9 +643,93 @@ async function renderSiswaAbsensiView(el, user) {
     });
   });
 
-  el.querySelectorAll('[data-cal-info]').forEach(dayEl => {
+  // Modal Rincian Kehadiran Interaktif per Tanggal
+  el.querySelectorAll('[data-cal-date]').forEach(dayEl => {
     dayEl.addEventListener('click', () => {
-      toast(dayEl.dataset.calInfo, 'info');
+      const dateStr = dayEl.dataset.calDate;
+      const rec = riwayat.find(r => r.tanggal === dateStr);
+      const parsedDate = parseLocalDate(dateStr);
+      const formattedDate = parsedDate.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+      if (!rec) {
+        openModal(`
+          <div class="modal-head">
+            <h3>Rincian Presensi Harian</h3>
+            <button class="close-x" id="modal-close">&times;</button>
+          </div>
+          <div class="modal-body" style="text-align:center; padding:28px 16px;">
+            <div style="width:48px; height:48px; border-radius:50%; background:var(--paper-dim); display:flex; align-items:center; justify-content:center; margin:0 auto 12px; color:var(--ink-soft);">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:24px;height:24px;"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+            </div>
+            <div style="font-weight:700; font-size:16px; color:var(--ink);">${formattedDate}</div>
+            <div style="font-size:13px; color:var(--ink-soft); margin-top:6px;">Tidak ada rekaman presensi pada tanggal ini (hari libur atau kegiatan khusus).</div>
+          </div>
+          <div class="modal-foot">
+            <button class="btn btn-primary" id="modal-cancel" style="width:100%;">Tutup</button>
+          </div>
+        `);
+        return;
+      }
+
+      let statusBadge = '';
+      if (rec.status === 'hadir') statusBadge = '<span class="badge lunas" style="font-size:13px; padding:6px 14px;">✓ Hadir Tepat Waktu</span>';
+      else if (rec.status === 'terlambat') statusBadge = '<span class="badge parsial" style="font-size:13px; padding:6px 14px;">! Terlambat</span>';
+      else if (rec.status === 'izin') statusBadge = '<span class="badge" style="background:var(--blue-soft); color:var(--blue); font-size:13px; padding:6px 14px;">Izin</span>';
+      else if (rec.status === 'sakit') statusBadge = '<span class="badge" style="background:var(--gold-soft); color:var(--gold); font-size:13px; padding:6px 14px;">Sakit</span>';
+      else statusBadge = '<span class="badge nunggak" style="font-size:13px; padding:6px 14px;">Alpa</span>';
+
+      openModal(`
+        <div class="modal-head">
+          <div>
+            <h3 style="margin:0;">Rincian Presensi & Ibadah</h3>
+            <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">${formattedDate}</div>
+          </div>
+          <button class="close-x" id="modal-close">&times;</button>
+        </div>
+        <div class="modal-body">
+          <div style="display:flex; justify-content:space-between; align-items:center; background:var(--paper-dim); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:14px;">
+            <div>
+              <div style="font-size:14px; font-weight:700; color:var(--ink);">${escapeHtml(siswa.nama)}</div>
+              <div style="font-size:12px; color:var(--ink-soft); margin-top:1px;">NIS: ${escapeHtml(siswa.nis || '-')} • Kelas ${escapeHtml(siswa.kelas)}</div>
+            </div>
+            ${statusBadge}
+          </div>
+
+          <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; margin-bottom:14px;">
+            <div class="time-pill-box ${rec.jamMasuk ? 'active' : ''}">
+              <div class="tpb-label">📥 Jam Masuk</div>
+              <div class="tpb-time monospace">${formatTimeDisplay(rec.jamMasuk)}</div>
+            </div>
+            <div class="time-pill-box ${rec.jamPulang ? 'active' : ''}">
+              <div class="tpb-label">📤 Jam Pulang</div>
+              <div class="tpb-time monospace">${formatTimeDisplay(rec.jamPulang)}</div>
+            </div>
+            <div class="time-pill-box duha ${rec.jamDuha ? 'active' : ''}">
+              <div class="tpb-label">☀️ Solat Duha</div>
+              <div class="tpb-time monospace">${formatTimeDisplay(rec.jamDuha)}</div>
+            </div>
+            <div class="time-pill-box dzuhur ${rec.jamDzuhur ? 'active' : ''}">
+              <div class="tpb-label">🕌 Solat Dzuhur</div>
+              <div class="tpb-time monospace">${formatTimeDisplay(rec.jamDzuhur)}</div>
+            </div>
+          </div>
+
+          ${rec.keterangan ? `
+            <div style="background:var(--paper-dim); border:1px solid var(--line); border-radius:8px; padding:10px 12px; margin-bottom:12px;">
+              <div style="font-size:11.5px; font-weight:600; color:var(--ink-soft);">Catatan / Alasan:</div>
+              <div style="font-size:13px; color:var(--ink); margin-top:2px;">${escapeHtml(rec.keterangan)}</div>
+            </div>
+          ` : ''}
+
+          <div style="font-size:11.5px; color:var(--ink-soft); display:flex; align-items:center; gap:6px;">
+            <span>Metode Presensi:</span>
+            <strong>${escapeHtml(rec.metode || 'RFID / QR Scanner Gerbang')}</strong>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn btn-primary" id="modal-cancel" style="width:100%;">Tutup</button>
+        </div>
+      `);
     });
   });
 }
@@ -680,7 +764,7 @@ function generateAttendanceCalendarHtml(year, month, riwayat) {
     }
 
     cells.push(`
-      <div class="cal-day ${isToday ? 'today' : ''} ${dotClass ? 'has-record' : ''}" ${dotClass ? `style="cursor:pointer;" data-cal-info="${escapeAttr(`${day} ${BULAN[month-1]} ${year} — ${dayStatusTooltip}`)}"` : ''} title="${day} ${BULAN[month-1]}: ${dayStatusTooltip || 'Tidak ada catatan'}">
+      <div class="cal-day ${isToday ? 'today' : ''} ${dotClass ? 'has-record' : ''}" style="cursor:pointer;" data-cal-date="${dayStr}" data-cal-info="${escapeAttr(`${day} ${BULAN[month-1]} ${year} — ${dayStatusTooltip || 'Tidak ada catatan'}`)}" title="${day} ${BULAN[month-1]}: ${dayStatusTooltip || 'Klik untuk rincian'}">
         <span class="day-number">${day}</span>
         ${dotClass ? `<span class="cal-dot ${dotClass}"></span>` : ''}
       </div>

@@ -4102,3 +4102,22 @@ body.dark-mode .time-pill-box.dzuhur.active {
     grid-template-columns: 1fr !important;
   }
 }
+
+/* Print rules for Surat Keterangan Bebas Administrasi & Kartu SPP 1 Tahun */
+@media print {
+  .print-surat-bebas, .print-kartu-spp {
+    width: 100% !important;
+    max-width: 100% !important;
+    border: none !important;
+    padding: 10mm 15mm !important;
+    page-break-inside: avoid;
+    break-inside: avoid;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
+
+/* Modal Edit Profil Siswa */
+.st-prof-section {
+  animation: fadeIn 0.15s ease-in-out;
+}
