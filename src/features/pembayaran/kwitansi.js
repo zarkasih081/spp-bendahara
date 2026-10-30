@@ -1,7 +1,6 @@
 import { store } from '../../app/state.js';
-import { BULAN } from '../../utils/helpers.js';
+import { BULAN, getSchoolLogo } from '../../utils/helpers.js';
 import { fmtDate, fmtRupiah, escapeHtml, formatWaLink } from '../../utils/formatters.js';
-import { LOGO_BASE64 } from '../../utils/constants.js';
 import { openModal } from '../../components/Modal.js';
 
 export function cetakKwitansi(siswa, months, nominal, noKwitansi, tanggal, jenis) {
@@ -26,7 +25,7 @@ export function cetakKwitansi(siswa, months, nominal, noKwitansi, tanggal, jenis
   area.innerHTML = `
     <div class="receipt">
       <div class="receipt-head">
-        <img src="${LOGO_BASE64}" class="seal" alt="Logo">
+        <img src="${getSchoolLogo()}" class="seal" alt="Logo">
         <div class="sekolah">${escapeHtml(s.namaSekolah)}</div>
         <div class="ta">Tahun Ajaran ${escapeHtml(s.tahunAjaran)}</div>
       </div>

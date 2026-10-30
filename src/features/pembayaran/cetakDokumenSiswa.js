@@ -1,7 +1,6 @@
 import { store } from '../../app/state.js';
-import { BULAN, getPeriode, siswaTotalBulan, getActiveTahunMulai } from '../../utils/helpers.js';
+import { BULAN, getPeriode, siswaTotalBulan, getActiveTahunMulai, getSchoolLogo } from '../../utils/helpers.js';
 import { fmtDate, fmtRupiah, escapeHtml } from '../../utils/formatters.js';
-import { LOGO_BASE64 } from '../../utils/constants.js';
 import { openModal } from '../../components/Modal.js';
 import { parseLocalDate } from '../absensi/absensiService.js';
 
@@ -20,7 +19,7 @@ export function cetakSuratBebasAdministrasi(siswa) {
     <div class="print-surat-bebas" style="max-width:680px; margin:0 auto; padding:32px 36px; background:#fff; color:#0f172a; font-family:'Inter', Arial, sans-serif; font-size:13.5px; line-height:1.6; border:1px solid #e2e8f0;">
       <!-- Kop Surat Resmi -->
       <div style="display:flex; align-items:center; gap:16px; border-bottom:3px double #0f172a; padding-bottom:14px; margin-bottom:20px;">
-        <img src="${LOGO_BASE64}" alt="Logo" style="width:68px; height:68px; object-fit:contain;" />
+        <img src="${getSchoolLogo()}" alt="Logo" style="width:68px; height:68px; object-fit:contain;" />
         <div style="text-align:center; flex:1;">
           <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#475569;">YAYASAN PENDIDIKAN ISLAM</div>
           <div style="font-size:20px; font-weight:800; letter-spacing:0.04em; color:#0f172a; text-transform:uppercase;">${escapeHtml(s.namaSekolah || 'MADRASAH TSANAWIYAH YASTA BUNTER')}</div>
@@ -190,7 +189,7 @@ export function cetakKartuSppTahunan(siswa, targetTahunMulai) {
     <div class="print-kartu-spp" style="max-width:720px; margin:0 auto; padding:28px 32px; background:#fff; color:#0f172a; font-family:'Inter', Arial, sans-serif; font-size:12.5px; line-height:1.5; border:1px solid #e2e8f0;">
       <!-- Kop Surat Resmi -->
       <div style="display:flex; align-items:center; gap:16px; border-bottom:3px double #0f172a; padding-bottom:12px; margin-bottom:16px;">
-        <img src="${LOGO_BASE64}" alt="Logo" style="width:60px; height:60px; object-fit:contain;" />
+        <img src="${getSchoolLogo()}" alt="Logo" style="width:60px; height:60px; object-fit:contain;" />
         <div style="text-align:center; flex:1;">
           <div style="font-size:10.5px; font-weight:700; letter-spacing:0.1em; text-transform:uppercase; color:#475569;">KARTU KONTROL PEMBAYARAN SPP</div>
           <div style="font-size:18px; font-weight:800; letter-spacing:0.03em; color:#0f172a; text-transform:uppercase;">${escapeHtml(s.namaSekolah || 'MADRASAH TSANAWIYAH YASTA BUNTER')}</div>

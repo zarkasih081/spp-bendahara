@@ -2,9 +2,11 @@ import { store } from '../../app/state.js';
 import { defaultState, saveData } from '../../data/database.js';
 import { hashPassword } from '../../data/authStorage.js';
 import { triggerRender } from '../../utils/events.js';
-import { BULAN, toast, downloadFile } from '../../utils/helpers.js';
+import { BULAN, toast, downloadFile, getSchoolLogo } from '../../utils/helpers.js';
 import { escapeHtml, escapeAttr, fmtRupiah } from '../../utils/formatters.js';
 import { openConfirm, openModal, closeModal } from '../../components/Modal.js';
+import { LOGO_BASE64 } from '../../utils/constants.js';
+import { compressImageFile } from '../../utils/imageHelper.js';
 
 export function renderPengaturan(){
   const el = document.getElementById('page-pengaturan');
@@ -34,11 +36,34 @@ export function renderPengaturan(){
   const lockedYears = s.tahunAjaranTerkunci || [];
   const currentTaMulai = s.tahunMulai || new Date().getFullYear();
   const availableYears = [currentTaMulai - 2, currentTaMulai - 1, currentTaMulai, currentTaMulai + 1];
+  let currentLogo = s.logoSekolah || '';
 
   el.innerHTML = `
     <div class="card" style="max-width:580px;">
       <h3>Identitas Sekolah & Pimpinan</h3>
       <div class="card-sub">Digunakan pada kwitansi resmi, kartu pelajar digital, dan laporan kas</div>
+      
+      <!-- Logo Sekolah Uploader -->
+      <div style="display:flex; align-items:center; gap:16px; background:var(--paper-dim); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin:14px 0 16px;">
+        <div style="width:68px; height:68px; border-radius:12px; border:2px solid var(--line); background:#fff; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; box-shadow:0 2px 6px rgba(0,0,0,0.06);">
+          <img id="set-logo-preview" src="${currentLogo || LOGO_BASE64}" alt="Logo Sekolah" style="width:100%; height:100%; object-fit:contain; padding:2px;">
+        </div>
+        <div style="flex:1;">
+          <div style="font-weight:700; font-size:13.5px; color:var(--ink);">Logo Resmi Sekolah / Madrasah</div>
+          <div style="font-size:11.5px; color:var(--ink-soft); margin-top:2px;">Tampil di Kuitansi, Kartu Pelajar Digital, BKK, dan Dokumen Resmi. Format disarankan: PNG transparan atau JPG.</div>
+          <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-sm btn-secondary" id="btn-upload-logo" style="font-size:12px; padding:5px 12px; display:inline-flex; align-items:center; gap:5px;">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
+              <span>Ganti Logo Sekolah</span>
+            </button>
+            <button type="button" class="btn btn-sm btn-ghost" id="btn-reset-logo" style="font-size:12px; padding:5px 10px; color:var(--rust); ${currentLogo ? '' : 'display:none;'}">
+              Gunakan Logo Default
+            </button>
+            <input type="file" id="input-logo-file" accept="image/*" style="display:none;">
+          </div>
+        </div>
+      </div>
+
       <div class="form-group"><label>Nama Sekolah / Madrasah</label><input id="set-nama" style="width:100%;" value="${escapeAttr(s.namaSekolah)}"></div>
       <div class="form-group"><label>Alamat Sekolah</label><input id="set-alamat" style="width:100%;" value="${escapeAttr(s.alamatSekolah || '')}" placeholder="cth. Jl. Raya Bunter, Sukadana, Ciamis"></div>
       <div class="form-row">
@@ -335,7 +360,36 @@ export function renderPengaturan(){
     });
   });
 
+  // School Logo upload & reset listeners
+  const inputLogoFile = document.getElementById('input-logo-file');
+  document.getElementById('btn-upload-logo')?.addEventListener('click', () => inputLogoFile?.click());
+  inputLogoFile?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      currentLogo = await compressImageFile(file, 280, 0.86);
+      const imgPrev = document.getElementById('set-logo-preview');
+      if (imgPrev) imgPrev.src = currentLogo;
+      const btnReset = document.getElementById('btn-reset-logo');
+      if (btnReset) btnReset.style.display = 'inline-block';
+      toast('Logo sekolah berhasil dimuat (klik Simpan Pengaturan)', 'info');
+    } catch (err) {
+      toast(err.message || 'Gagal memproses gambar logo', 'error');
+    }
+  });
+
+  document.getElementById('btn-reset-logo')?.addEventListener('click', () => {
+    currentLogo = '';
+    const imgPrev = document.getElementById('set-logo-preview');
+    if (imgPrev) imgPrev.src = LOGO_BASE64;
+    const btnReset = document.getElementById('btn-reset-logo');
+    if (btnReset) btnReset.style.display = 'none';
+    if (inputLogoFile) inputLogoFile.value = '';
+    toast('Logo direset ke bawaan resmi', 'info');
+  });
+
   document.getElementById('btn-save-settings').addEventListener('click', async ()=>{
+    s.logoSekolah = currentLogo;
     s.namaSekolah = document.getElementById('set-nama').value.trim() || s.namaSekolah;
     s.alamatSekolah = document.getElementById('set-alamat')?.value.trim() || s.alamatSekolah || '';
     s.kepalaMadrasah = document.getElementById('set-kepala')?.value.trim() || s.kepalaMadrasah || '';

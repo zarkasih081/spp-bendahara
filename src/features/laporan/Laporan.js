@@ -1,10 +1,9 @@
 import { store } from '../../app/state.js';
 import { saveData } from '../../data/database.js';
-import { getPeriode, BULAN, downloadFile, toast, getActiveTahunMulai } from '../../utils/helpers.js';
+import { getPeriode, BULAN, downloadFile, toast, getActiveTahunMulai, getSchoolLogo } from '../../utils/helpers.js';
 import { escapeHtml, escapeAttr, fmtDate, fmtRupiah } from '../../utils/formatters.js';
 import { openConfirm, openModal, closeModal } from '../../components/Modal.js';
 import { cetakKwitansi } from '../pembayaran/kwitansi.js';
-import { LOGO_BASE64 } from '../../utils/constants.js';
 import { KATEGORI_PENGELUARAN, savePengeluaran, deletePengeluaran, cetakBuktiKasKeluar, exportPengeluaranExcel } from './pengeluaranService.js';
 import * as XLSX from 'xlsx';
 
@@ -642,7 +641,7 @@ function cetakRekapKasTahunan(monthlyData, activeTaStart, grandTotalMasuk, grand
     <div class="print-laporan-tahunan" style="max-width:860px; margin:0 auto; padding:24px 30px; font-family:'Inter', Arial, sans-serif; font-size:12px; color:#0F172A; line-height:1.5;">
       <!-- Kop Surat -->
       <div style="display:flex; align-items:center; gap:16px; border-bottom:3px double #0F172A; padding-bottom:12px; margin-bottom:16px;">
-        <img src="${LOGO_BASE64}" alt="Logo" style="width:65px; height:65px; object-fit:contain;" />
+        <img src="${getSchoolLogo()}" alt="Logo" style="width:65px; height:65px; object-fit:contain;" />
         <div style="text-align:center; flex:1;">
           <div style="font-size:11px; font-weight:700; letter-spacing:0.12em; text-transform:uppercase; color:#475569;">LEMBAGA PENDIDIKAN MA'ARIF NU</div>
           <div style="font-size:18px; font-weight:800; text-transform:uppercase; color:#0F172A;">${escapeHtml(s.namaSekolah || 'MADRASAH TSANAWIYAH YASTA BUNTER')}</div>

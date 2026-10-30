@@ -3,9 +3,8 @@ import { store } from './state.js';
 import { loadData } from '../data/database.js';
 import { renderNav, PAGE_META } from '../components/Navigation.js';
 import { setupModalEvents } from '../components/Modal.js';
-import { getActiveTahunMulai } from '../utils/helpers.js';
+import { getActiveTahunMulai, getSchoolLogo } from '../utils/helpers.js';
 import { saveAuth } from '../data/authStorage.js';
-import { LOGO_BASE64 } from '../utils/constants.js';
 import { escapeHtml } from '../utils/formatters.js';
 import { getStudentInitials } from '../features/absensi/qrCardGenerator.js';
 
@@ -91,7 +90,7 @@ export function render(){
         <div class="student-topbar-wrapper">
           <div class="student-topbar-brand">
             <div class="st-brand-logo">
-              <img src="${LOGO_BASE64}" alt="Logo" />
+              <img src="${getSchoolLogo()}" alt="Logo" />
             </div>
             <div class="st-brand-text">
               <div class="st-title">

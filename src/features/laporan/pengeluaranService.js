@@ -1,7 +1,7 @@
 import { store } from '../../app/state.js';
 import { saveData } from '../../data/database.js';
 import { terbilang, fmtRupiah, escapeHtml } from '../../utils/formatters.js';
-import { LOGO_BASE64 } from '../../utils/constants.js';
+import { getSchoolLogo } from '../../utils/helpers.js';
 import * as XLSX from 'xlsx';
 
 export const KATEGORI_PENGELUARAN = [
@@ -64,7 +64,7 @@ export function cetakBuktiKasKeluar(bkk) {
     <div class="kwitansi-print-wrapper" style="max-width:740px; margin:0 auto; padding:24px; font-family:'Plus Jakarta Sans', sans-serif; color:#0F172A; background:#FFFFFF; border:2px solid #334155; border-radius:12px;">
       <!-- KOP RESMI -->
       <div style="display:flex; align-items:center; gap:16px; border-bottom:2.5px solid #1E293B; padding-bottom:14px; margin-bottom:14px;">
-        <img src="${LOGO_BASE64}" alt="Logo" style="width:64px; height:64px; object-fit:contain;">
+        <img src="${getSchoolLogo()}" alt="Logo" style="width:64px; height:64px; object-fit:contain;">
         <div style="flex:1;">
           <div style="font-size:18px; font-weight:800; text-transform:uppercase; letter-spacing:0.04em; color:#1E1B4B;">${escapeHtml(s.namaSekolah)}</div>
           <div style="font-size:12px; color:#475569; margin-top:2px;">${escapeHtml(s.alamatSekolah)}</div>

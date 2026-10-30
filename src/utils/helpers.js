@@ -1,6 +1,7 @@
 import { store } from '../app/state.js';
 import { triggerRender } from './events.js';
 import { escapeHtml } from './formatters.js';
+import { LOGO_BASE64 } from './constants.js';
 
 export const BULAN = ["Januari","Februari","Maret","April","Mei","Juni","Juli","Agustus","September","Oktober","November","Desember"];
 
@@ -123,5 +124,10 @@ export function emptyState(iconSvg, title, desc, btnLabel, onClick){
     <button class="btn btn-primary" style="margin-top:16px;" id="${id}">${escapeHtml(btnLabel)}</button>
   </div>`;
 }
+
+export function getSchoolLogo() {
+  return store.state?.settings?.logoSekolah || LOGO_BASE64;
+}
+
 
 

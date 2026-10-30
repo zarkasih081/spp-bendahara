@@ -1,6 +1,7 @@
 import { store } from '../app/state.js';
 import { saveAuth } from '../data/authStorage.js';
 import { triggerRender } from '../utils/events.js';
+import { getSchoolLogo } from '../utils/helpers.js';
 
 export const PAGE_META = {
   dashboard: { title:'Dashboard', sub:'Ringkasan pemasukan SPP dan status pembayaran' },
@@ -39,6 +40,12 @@ export function renderNav(){
   const bottomNav = document.getElementById('bottom-nav');
   let html = '';
   let lastGroup = null;
+
+  // Sinkronkan logo sekolah di header sidebar
+  const brandImg = document.querySelector('.brand img');
+  if (brandImg) {
+    brandImg.src = getSchoolLogo();
+  }
   
   const user = store.ui.currentUser;
   

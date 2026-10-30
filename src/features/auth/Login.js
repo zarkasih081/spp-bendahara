@@ -1,9 +1,8 @@
 import { store } from '../../app/state.js';
 import { saveAuth, hashPassword } from '../../data/authStorage.js';
 import { triggerRender } from '../../utils/events.js';
-import { toast } from '../../utils/helpers.js';
+import { toast, getSchoolLogo } from '../../utils/helpers.js';
 import { escapeHtml, formatWaLink } from '../../utils/formatters.js';
-import { LOGO_BASE64 } from '../../utils/constants.js';
 import { openModal } from '../../components/Modal.js';
 
 export function renderLogin() {
@@ -41,7 +40,7 @@ export function renderLogin() {
       <div class="login-right">
         <div class="login-card">
           <div class="login-logo" id="secret-trigger" style="background: transparent; box-shadow: none; width: auto; height: auto; cursor: default; -webkit-tap-highlight-color: transparent; -webkit-touch-callout: none; user-select: none; outline: none;">
-            <img src="${LOGO_BASE64}" alt="Logo Sekolah" draggable="false" style="width: 80px; height: 80px; object-fit: contain; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.15)); margin-bottom: -10px; pointer-events: none; user-select: none; -webkit-user-drag: none; -webkit-touch-callout: none;">
+            <img src="${getSchoolLogo()}" alt="Logo Sekolah" draggable="false" style="width: 80px; height: 80px; object-fit: contain; filter: drop-shadow(0 8px 16px rgba(0,0,0,0.15)); margin-bottom: -10px; pointer-events: none; user-select: none; -webkit-user-drag: none; -webkit-touch-callout: none;">
           </div>
           <div class="login-role-switcher" style="display:flex; background:var(--paper-dim); border:1px solid var(--line); border-radius:12px; padding:4px; margin-bottom:20px; gap:4px;">
             <button type="button" class="login-role-tab active" id="tab-login-siswa" style="flex:1; border:none; padding:8px 12px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; background:var(--primary); color:#fff; transition:all 0.2s;">

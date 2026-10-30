@@ -1,6 +1,6 @@
 import QRCode from 'qrcode';
 import { store } from '../../app/state.js';
-import { LOGO_BASE64 } from '../../utils/constants.js';
+import { getSchoolLogo } from '../../utils/helpers.js';
 import { escapeHtml, escapeAttr } from '../../utils/formatters.js';
 
 export async function generateQrDataUrl(text) {
@@ -83,7 +83,7 @@ export async function downloadStudentQrCardPng(siswa) {
   ctx.stroke();
 
   // Load School Logo
-  const logoImg = await loadImage(LOGO_BASE64);
+  const logoImg = await loadImage(getSchoolLogo());
   if (logoImg) {
     ctx.drawImage(logoImg, 40, 24, 66, 66);
   }
@@ -352,7 +352,7 @@ export async function downloadStudentCardBackPng(siswa) {
   ctx.stroke();
 
   // Load School Logo
-  const logoImg = await loadImage(LOGO_BASE64);
+  const logoImg = await loadImage(getSchoolLogo());
   if (logoImg) {
     ctx.drawImage(logoImg, 40, 24, 66, 66);
   }
@@ -520,7 +520,7 @@ export async function renderStudentCardHtml(siswa, options = {}) {
       <div class="id-card-face id-card-front">
         <div class="id-card-header">
           <div class="id-card-logo">
-            <img src="${LOGO_BASE64}" alt="Logo">
+            <img src="${getSchoolLogo()}" alt="Logo">
           </div>
           <div class="id-card-school">
             <div class="school-name">${escapeHtml(namaSekolah)}</div>
@@ -573,7 +573,7 @@ export async function renderStudentCardHtml(siswa, options = {}) {
       <div class="id-card-face id-card-back">
         <div class="id-card-header back-header">
           <div class="id-card-logo">
-            <img src="${LOGO_BASE64}" alt="Logo">
+            <img src="${getSchoolLogo()}" alt="Logo">
           </div>
           <div class="id-card-school">
             <div class="school-name">${escapeHtml(namaSekolah)}</div>
