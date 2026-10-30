@@ -6,7 +6,7 @@ export function getSiswaById(id) {
   return store.state.siswa.find(s => s.id === id);
 }
 
-export function validateSiswa(nama, kelas, nis, editingId) {
+export function validateSiswa(nama, kelas, nis, editingId, rfidUid = '') {
   if (!nama || !kelas) {
     return { valid: false, error: 'Nama dan kelas wajib diisi' };
   }
@@ -14,6 +14,13 @@ export function validateSiswa(nama, kelas, nis, editingId) {
     const duplikat = store.state.siswa.find(s => s.nis === nis && (!editingId || s.id !== editingId));
     if (duplikat) {
       return { valid: false, error: 'NIS sudah terdaftar untuk siswa lain' };
+    }
+  }
+  if (rfidUid) {
+    const cleanUid = String(rfidUid).trim();
+    const duplikatRfid = store.state.siswa.find(s => s.rfidUid && s.rfidUid.trim() === cleanUid && (!editingId || s.id !== editingId));
+    if (duplikatRfid) {
+      return { valid: false, error: `UID Kartu RFID sudah terdaftar atas nama ${duplikatRfid.nama}` };
     }
   }
   return { valid: true };

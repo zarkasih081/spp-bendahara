@@ -274,10 +274,17 @@ function openSiswaModal(id){
         <input id="f-nohp" style="width:100%;" value="${editing?escapeAttr(editing.noHp||''):''}" placeholder="cth. 08123456789">
         <div class="helper-text">Digunakan untuk mengirim tagihan dan kwitansi via WhatsApp otomatis.</div>
       </div>
-      <div class="form-group">
-        <label>Kata Sandi (PIN) Akses Siswa</label>
-        <input id="f-pin" style="width:100%;" value="${editing?escapeAttr(editing.pin||''):''}" placeholder="Masukkan PIN atau password">
-        <div class="helper-text">Digunakan siswa untuk masuk bersama dengan NIS. Boleh dikosongkan.</div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Kata Sandi (PIN) Akses Siswa</label>
+          <input id="f-pin" style="width:100%;" value="${editing?escapeAttr(editing.pin||''):''}" placeholder="Masukkan PIN atau password">
+          <div class="helper-text">Digunakan siswa untuk masuk bersama NIS.</div>
+        </div>
+        <div class="form-group">
+          <label>UID Kartu RFID 125KHz (opsional)</label>
+          <input id="f-rfid" class="monospace" style="width:100%;" value="${editing?escapeAttr(editing.rfidUid||''):''}" placeholder="Tap kartu RFID di sini..." autocomplete="off">
+          <div class="helper-text">Klik kotak ini lalu tempelkan kartu ke RFID Reader.</div>
+        </div>
       </div>
     </div>
     <div class="modal-foot">
@@ -285,31 +292,40 @@ function openSiswaModal(id){
       <button class="btn btn-primary" id="modal-save">${editing?'Simpan Perubahan':'Tambah Siswa'}</button>
     </div>
   `);
+  document.getElementById('f-rfid')?.addEventListener('keydown', e => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      toast('UID Kartu RFID terbaca: ' + e.target.value.trim(), 'info');
+    }
+  });
   document.getElementById('modal-save').addEventListener('click', ()=>{
     const inNama = document.getElementById('f-nama');
     const inKelas = document.getElementById('f-kelas');
     const inNis = document.getElementById('f-nis');
+    const inRfid = document.getElementById('f-rfid');
     const nama = inNama.value.trim();
     const kelas = inKelas.value.trim();
     const nis = inNis.value.trim();
     const noHp = document.getElementById('f-nohp').value.trim();
     const pin = document.getElementById('f-pin').value.trim();
+    const rfidUid = inRfid ? inRfid.value.trim() : '';
     
     // Clear previous errors
-    [inNama, inKelas, inNis].forEach(el => el.classList.remove('error'));
+    [inNama, inKelas, inNis, inRfid].filter(Boolean).forEach(el => el.classList.remove('error'));
     
-    const validation = validateSiswa(nama, kelas, nis, editing ? editing.id : null);
+    const validation = validateSiswa(nama, kelas, nis, editing ? editing.id : null, rfidUid);
     if (!validation.valid) {
       if(validation.error.includes('Nama')) { inNama.classList.add('error'); inKelas.classList.add('error'); }
       if(validation.error.includes('NIS')) inNis.classList.add('error');
+      if(validation.error.includes('RFID') && inRfid) inRfid.classList.add('error');
       toast(validation.error, 'warning');
       return;
     }
 
     if(editing){
-      updateSiswa(editing.id, { nama, kelas, nis, noHp, pin });
+      updateSiswa(editing.id, { nama, kelas, nis, noHp, pin, rfidUid });
     } else {
-      addSiswa({ nama, kelas, nis, noHp, pin });
+      addSiswa({ nama, kelas, nis, noHp, pin, rfidUid });
     }
     closeModal(); renderSiswa();
   });

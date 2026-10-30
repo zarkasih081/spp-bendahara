@@ -79,32 +79,102 @@ export function playScanSound(type = 'success') {
   }
 }
 
-// Find student by scanned QR code (NIS, ID, or JSON payload)
+// Normalize UID for comparison (handles leading zeros from different 125KHz readers)
+function normalizeRfidUid(val) {
+  if (!val) return '';
+  const trimmed = String(val).trim();
+  if (/^\d+$/.test(trimmed)) {
+    return trimmed.replace(/^0+/, '') || '0';
+  }
+  return trimmed.toLowerCase();
+}
+
+export function registerRfidUid(siswaId, rawUid) {
+  const cleanUid = String(rawUid || '').trim();
+  if (!cleanUid) {
+    return { success: false, message: 'UID Kartu RFID tidak boleh kosong.' };
+  }
+  const siswa = store.state.siswa.find(s => s.id === siswaId);
+  if (!siswa) {
+    return { success: false, message: 'Data siswa tidak ditemukan.' };
+  }
+
+  const normTarget = normalizeRfidUid(cleanUid);
+  const conflict = store.state.siswa.find(s =>
+    s.id !== siswaId &&
+    s.rfidUid &&
+    (s.rfidUid.trim() === cleanUid || normalizeRfidUid(s.rfidUid) === normTarget)
+  );
+  if (conflict) {
+    playScanSound('error');
+    return {
+      success: false,
+      message: `Kartu RFID (${cleanUid}) sudah terdaftar atas nama ${conflict.nama} (Kelas ${conflict.kelas})!`
+    };
+  }
+
+  siswa.rfidUid = cleanUid;
+  saveData(`Kartu RFID berhasil didaftarkan untuk ${siswa.nama}`);
+  playScanSound('success');
+  return {
+    success: true,
+    siswa,
+    uid: cleanUid,
+    message: `Kartu RFID (${cleanUid}) berhasil didaftarkan untuk ${siswa.nama}`
+  };
+}
+
+export function removeRfidUid(siswaId) {
+  const siswa = store.state.siswa.find(s => s.id === siswaId);
+  if (!siswa) return false;
+  siswa.rfidUid = '';
+  saveData(`UID Kartu RFID ${siswa.nama} dihapus`);
+  return true;
+}
+
+// Find student by scanned RFID UID, QR code (NIS, ID, or JSON payload)
 export function parseSiswaFromQr(rawCode) {
   if (!rawCode) return null;
   const code = String(rawCode).trim();
-  
-  // 1. Try match by NIS directly
-  let siswa = store.state.siswa.find(s => s.nis && s.nis.trim() === code);
+  const normCode = normalizeRfidUid(code);
+
+  // 1. Try match by RFID UID directly (exact or normalized numeric UID)
+  let siswa = store.state.siswa.find(s =>
+    s.rfidUid && (s.rfidUid.trim() === code || normalizeRfidUid(s.rfidUid) === normCode)
+  );
   if (siswa) return siswa;
 
-  // 2. Try match by ID directly
+  // 2. Try match by NIS directly
+  siswa = store.state.siswa.find(s => s.nis && s.nis.trim() === code);
+  if (siswa) return siswa;
+
+  // 3. Try match by ID directly
   siswa = store.state.siswa.find(s => s.id === code);
   if (siswa) return siswa;
 
-  // 3. Try match if code is formatted like "SISWA:12345" or "NIS:12345"
+  // 4. Try match if code is formatted like "SISWA:12345", "NIS:12345", or "UID:00123456"
   if (code.includes(':')) {
     const parts = code.split(':');
     const val = parts[1]?.trim();
     if (val) {
-      siswa = store.state.siswa.find(s => (s.nis && s.nis.trim() === val) || s.id === val);
+      const normVal = normalizeRfidUid(val);
+      siswa = store.state.siswa.find(s =>
+        (s.rfidUid && (s.rfidUid.trim() === val || normalizeRfidUid(s.rfidUid) === normVal)) ||
+        (s.nis && s.nis.trim() === val) ||
+        s.id === val
+      );
       if (siswa) return siswa;
     }
   }
 
-  // 4. Try parse as JSON
+  // 5. Try parse as JSON
   try {
     const obj = JSON.parse(code);
+    if (obj.uid || obj.rfidUid) {
+      const u = String(obj.uid || obj.rfidUid).trim();
+      siswa = store.state.siswa.find(s => s.rfidUid && (s.rfidUid.trim() === u || normalizeRfidUid(s.rfidUid) === normalizeRfidUid(u)));
+      if (siswa) return siswa;
+    }
     if (obj.nis) {
       siswa = store.state.siswa.find(s => s.nis && s.nis.trim() === String(obj.nis).trim());
       if (siswa) return siswa;
@@ -118,13 +188,15 @@ export function parseSiswaFromQr(rawCode) {
   return null;
 }
 
-export function catatAbsenByKode(rawCode) {
-  const siswa = parseSiswaFromQr(rawCode);
+export function catatAbsenByKode(rawCode, mode = 'auto') {
+  const cleanCode = String(rawCode || '').trim();
+  const siswa = parseSiswaFromQr(cleanCode);
   if (!siswa) {
     playScanSound('error');
     return {
       success: false,
-      message: 'Kartu QR tidak dikenali atau siswa tidak terdaftar dalam sistem!'
+      unknownUid: cleanCode,
+      message: `Kartu RFID / QR (${cleanCode || '-'}) belum terdaftar dalam sistem!`
     };
   }
 
@@ -139,6 +211,149 @@ export function catatAbsenByKode(rawCode) {
   const existingIndex = store.state.absensi.findIndex(a => a.siswaId === siswa.id && a.tanggal === tanggal);
   const nowMs = Date.now();
 
+  // ====================================================
+  // MODE IBADAH: SOLAT DUHA / SOLAT DZUHUR (Kiosk Terpadu)
+  // ====================================================
+  if (mode === 'duha' || mode === 'dzuhur') {
+    const isDuha = mode === 'duha';
+    const labelIbadah = isDuha ? 'Solat Duha' : 'Solat Dzuhur';
+    const fieldJam = isDuha ? 'jamDuha' : 'jamDzuhur';
+    const fieldWaktu = isDuha ? 'waktuScanDuha' : 'waktuScanDzuhur';
+
+    let record = existingIndex !== -1 ? store.state.absensi[existingIndex] : null;
+    if (!record) {
+      // Automatically create attendance record if student taps straight at prayer kiosk
+      const isTerlambat = jamSekarang.slice(0, 5) > jamMasukBatas;
+      record = {
+        id: uid(),
+        siswaId: siswa.id,
+        tanggal,
+        jamMasuk: jamSekarang,
+        jamPulang: null,
+        jamDuha: isDuha ? jamSekarang : null,
+        jamDzuhur: !isDuha ? jamSekarang : null,
+        status: isTerlambat ? 'terlambat' : 'hadir',
+        keterangan: `Hadir via Presensi ${labelIbadah}`,
+        waktuScanMasuk: nowMs,
+        waktuScanPulang: null,
+        [fieldWaktu]: nowMs,
+        waktuScanTerakhir: nowMs,
+        aktivitasTerakhir: labelIbadah
+      };
+      store.state.absensi.unshift(record);
+      saveData();
+      playScanSound('success');
+      return {
+        success: true,
+        type: mode,
+        aktivitas: labelIbadah,
+        siswa,
+        record,
+        status: record.status,
+        message: `Presensi ${labelIbadah} Berhasil: ${siswa.nama} (${formatTimeDisplay(jamSekarang)})`
+      };
+    }
+
+    if (record[fieldJam]) {
+      playScanSound('warning');
+      return {
+        success: true,
+        type: 'duplicate',
+        aktivitas: labelIbadah,
+        siswa,
+        record,
+        status: record.status,
+        message: `${siswa.nama} sudah tercatat ${labelIbadah} pukul ${formatTimeDisplay(record[fieldJam])}`
+      };
+    }
+
+    record[fieldJam] = jamSekarang;
+    record[fieldWaktu] = nowMs;
+    record.waktuScanTerakhir = nowMs;
+    record.aktivitasTerakhir = labelIbadah;
+    if (!record.jamMasuk && record.status === 'alpa') {
+      const isTerlambat = jamSekarang.slice(0, 5) > jamMasukBatas;
+      record.status = isTerlambat ? 'terlambat' : 'hadir';
+      record.jamMasuk = jamSekarang;
+    }
+    saveData();
+    playScanSound('success');
+    return {
+      success: true,
+      type: mode,
+      aktivitas: labelIbadah,
+      siswa,
+      record,
+      status: record.status,
+      message: `Presensi ${labelIbadah} Berhasil: ${siswa.nama} (${formatTimeDisplay(jamSekarang)})`
+    };
+  }
+
+  // ====================================================
+  // MODE EKSPLISIT: ABSEN PULANG
+  // ====================================================
+  if (mode === 'pulang') {
+    let record = existingIndex !== -1 ? store.state.absensi[existingIndex] : null;
+    if (!record) {
+      record = {
+        id: uid(),
+        siswaId: siswa.id,
+        tanggal,
+        jamMasuk: null,
+        jamPulang: jamSekarang,
+        jamDuha: null,
+        jamDzuhur: null,
+        status: 'hadir',
+        keterangan: 'Scan Pulang',
+        waktuScanMasuk: null,
+        waktuScanPulang: nowMs,
+        waktuScanTerakhir: nowMs,
+        aktivitasTerakhir: 'Absen Pulang'
+      };
+      store.state.absensi.unshift(record);
+      saveData();
+      playScanSound('success');
+      return {
+        success: true,
+        type: 'pulang',
+        siswa,
+        record,
+        status: record.status,
+        message: `Absen Pulang Berhasil: ${siswa.nama} (${formatTimeDisplay(jamSekarang)})`
+      };
+    }
+
+    if (record.jamPulang) {
+      playScanSound('warning');
+      return {
+        success: true,
+        type: 'completed',
+        siswa,
+        record,
+        status: record.status,
+        message: `${siswa.nama} sudah tercatat Absen Pulang pukul ${formatTimeDisplay(record.jamPulang)}`
+      };
+    }
+
+    record.jamPulang = jamSekarang;
+    record.waktuScanPulang = nowMs;
+    record.waktuScanTerakhir = nowMs;
+    record.aktivitasTerakhir = 'Absen Pulang';
+    saveData();
+    playScanSound('success');
+    return {
+      success: true,
+      type: 'pulang',
+      siswa,
+      record,
+      status: record.status,
+      message: `Absen Pulang Berhasil: ${siswa.nama} (${formatTimeDisplay(jamSekarang)})`
+    };
+  }
+
+  // ====================================================
+  // MODE MASUK / AUTO (SMART DETECTION)
+  // ====================================================
   if (existingIndex === -1) {
     // Record Absen Masuk
     const isTerlambat = jamSekarang.slice(0, 5) > jamMasukBatas;
@@ -150,10 +365,14 @@ export function catatAbsenByKode(rawCode) {
       tanggal,
       jamMasuk: jamSekarang,
       jamPulang: null,
+      jamDuha: null,
+      jamDzuhur: null,
       status,
       keterangan: isTerlambat ? `Terlambat (Batas ${jamMasukBatas})` : 'Tepat Waktu',
       waktuScanMasuk: nowMs,
-      waktuScanPulang: null
+      waktuScanPulang: null,
+      waktuScanTerakhir: nowMs,
+      aktivitasTerakhir: 'Absen Masuk'
     };
 
     store.state.absensi.unshift(record);
@@ -177,6 +396,8 @@ export function catatAbsenByKode(rawCode) {
       record.status = isTerlambat ? 'terlambat' : 'hadir';
       record.jamMasuk = jamSekarang;
       record.waktuScanMasuk = nowMs;
+      record.waktuScanTerakhir = nowMs;
+      record.aktivitasTerakhir = 'Absen Masuk';
       record.keterangan = isTerlambat ? `Terlambat (Batas ${jamMasukBatas})` : 'Tepat Waktu';
       saveData();
       playScanSound('success');
@@ -203,8 +424,21 @@ export function catatAbsenByKode(rawCode) {
       };
     }
 
+    // If mode is explicitly 'masuk' and student already has jamMasuk, report duplicate instead of triggering pulang
+    if (mode === 'masuk' && record.jamMasuk) {
+      playScanSound('warning');
+      return {
+        success: true,
+        type: 'duplicate',
+        siswa,
+        record,
+        status: record.status,
+        message: `${siswa.nama} sudah tercatat Absen Masuk pukul ${formatTimeDisplay(record.jamMasuk)}`
+      };
+    }
+
     // Debounce: If scanned within 20 seconds, ignore duplicate
-    const lastScanMs = record.waktuScanPulang || record.waktuScanMasuk || 0;
+    const lastScanMs = record.waktuScanTerakhir || record.waktuScanPulang || record.waktuScanMasuk || 0;
     if (nowMs - lastScanMs < 20000) {
       playScanSound('warning');
       return {
@@ -229,12 +463,14 @@ export function catatAbsenByKode(rawCode) {
           siswa,
           record,
           status: record.status,
-          message: `${siswa.nama} sudah Absen Masuk pukul ${formatTimeDisplay(record.jamMasuk)}. Scan pulang baru dapat dilakukan minimal 30 menit setelah masuk / saat jam pulang (${jamPulangBatas}).`
+          message: `${siswa.nama} sudah Absen Masuk pukul ${formatTimeDisplay(record.jamMasuk)}. Pilih tombol "Absen Pulang" jika ingin mencatat pulang lebih awal.`
         };
       }
 
       record.jamPulang = jamSekarang;
       record.waktuScanPulang = nowMs;
+      record.waktuScanTerakhir = nowMs;
+      record.aktivitasTerakhir = 'Absen Pulang';
       saveData();
       playScanSound('success');
 
@@ -263,15 +499,18 @@ export function catatAbsenByKode(rawCode) {
 
 export function manualAddOrUpdateAbsensi(data) {
   if (!store.state.absensi) store.state.absensi = [];
-  const { id, siswaId, tanggal, jamMasuk, jamPulang, status, keterangan } = data;
+  const { id, siswaId, tanggal, jamMasuk, jamPulang, jamDuha, jamDzuhur, status, keterangan } = data;
 
   if (id) {
     const item = store.state.absensi.find(a => a.id === id);
     if (item) {
       item.jamMasuk = jamMasuk !== undefined ? jamMasuk : item.jamMasuk;
       item.jamPulang = jamPulang !== undefined ? jamPulang : item.jamPulang;
+      if (jamDuha !== undefined) item.jamDuha = jamDuha;
+      if (jamDzuhur !== undefined) item.jamDzuhur = jamDzuhur;
       item.status = status || item.status;
       item.keterangan = keterangan !== undefined ? keterangan : item.keterangan;
+      item.waktuScanTerakhir = Date.now();
       saveData('Data absensi diperbarui');
       return;
     }
@@ -282,8 +521,11 @@ export function manualAddOrUpdateAbsensi(data) {
   if (existing) {
     existing.jamMasuk = jamMasuk !== undefined ? jamMasuk : existing.jamMasuk;
     existing.jamPulang = jamPulang !== undefined ? jamPulang : existing.jamPulang;
+    if (jamDuha !== undefined) existing.jamDuha = jamDuha;
+    if (jamDzuhur !== undefined) existing.jamDzuhur = jamDzuhur;
     existing.status = status || existing.status;
     existing.keterangan = keterangan !== undefined ? keterangan : existing.keterangan;
+    existing.waktuScanTerakhir = Date.now();
     saveData('Data absensi diperbarui');
   } else {
     store.state.absensi.unshift({
@@ -292,12 +534,47 @@ export function manualAddOrUpdateAbsensi(data) {
       tanggal,
       jamMasuk: jamMasuk || null,
       jamPulang: jamPulang || null,
+      jamDuha: jamDuha || null,
+      jamDzuhur: jamDzuhur || null,
       status: status || 'hadir',
       keterangan: keterangan || '',
-      waktuScanMasuk: Date.now()
+      waktuScanMasuk: Date.now(),
+      waktuScanTerakhir: Date.now()
     });
     saveData('Absensi siswa berhasil dicatat');
   }
+}
+
+export function markBulkHadir(siswaIds, tanggal) {
+  if (!store.state.absensi) store.state.absensi = [];
+  const jamMasukDefault = store.state?.settings?.jamMasuk || '07:00:00';
+  const jamFormatted = jamMasukDefault.length === 5 ? `${jamMasukDefault}:00` : jamMasukDefault;
+  let count = 0;
+
+  siswaIds.forEach(sId => {
+    const existing = store.state.absensi.find(a => a.siswaId === sId && a.tanggal === tanggal);
+    if (!existing) {
+      store.state.absensi.unshift({
+        id: uid(),
+        siswaId: sId,
+        tanggal,
+        jamMasuk: jamFormatted,
+        jamPulang: null,
+        jamDuha: null,
+        jamDzuhur: null,
+        status: 'hadir',
+        keterangan: 'Tepat Waktu (Catat Masal)',
+        waktuScanMasuk: Date.now(),
+        waktuScanTerakhir: Date.now()
+      });
+      count++;
+    }
+  });
+
+  if (count > 0) {
+    saveData(`${count} siswa ditandai Hadir Tepat Waktu`);
+  }
+  return count;
 }
 
 export function deleteAbsensi(id) {
@@ -320,6 +597,8 @@ export function getStatistikAbsensi(tanggal, kelasFilter = '') {
   let izin = 0;
   let sakit = 0;
   let alpa = 0;
+  let duha = 0;
+  let dzuhur = 0;
 
   records.forEach(r => {
     if (r.status === 'hadir') hadir++;
@@ -327,6 +606,9 @@ export function getStatistikAbsensi(tanggal, kelasFilter = '') {
     else if (r.status === 'izin') izin++;
     else if (r.status === 'sakit') sakit++;
     else if (r.status === 'alpa') alpa++;
+
+    if (r.jamDuha) duha++;
+    if (r.jamDzuhur) dzuhur++;
   });
 
   const totalTercatat = hadir + terlambat + izin + sakit + alpa;
@@ -339,6 +621,8 @@ export function getStatistikAbsensi(tanggal, kelasFilter = '') {
     izin,
     sakit,
     alpa,
+    duha,
+    dzuhur,
     belumHadir,
     records
   };
@@ -367,12 +651,16 @@ export function exportAbsensiExcel(tanggal, kelasFilter = '') {
     let statusLabel = 'Belum Hadir';
     let jamMsk = '-';
     let jamPlg = '-';
+    let jamDuha = '-';
+    let jamDzuhur = '-';
     let ket = '';
 
     if (rec) {
       statusLabel = rec.status.toUpperCase();
       jamMsk = rec.jamMasuk || '-';
       jamPlg = rec.jamPulang || '-';
+      jamDuha = rec.jamDuha || '-';
+      jamDzuhur = rec.jamDzuhur || '-';
       ket = rec.keterangan || '';
     }
 
@@ -382,48 +670,99 @@ export function exportAbsensiExcel(tanggal, kelasFilter = '') {
       'Nama Siswa': s.nama,
       'Kelas': s.kelas,
       'NIS': s.nis || '-',
+      'UID RFID': s.rfidUid || '-',
       'Status': statusLabel,
       'Jam Masuk': jamMsk,
       'Jam Pulang': jamPlg,
+      'Solat Duha': jamDuha,
+      'Solat Dzuhur': jamDzuhur,
       'Keterangan': ket
     };
   });
 
   const ws = XLSX.utils.json_to_sheet(rows);
   const wb = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(wb, ws, 'Rekap Absensi');
+  XLSX.utils.book_append_sheet(wb, ws, 'Rekap Absensi Harian');
 
   const fileName = `Rekap_Absensi_${kelasFilter ? kelasFilter.replace(/\s+/g, '_') + '_' : ''}${tanggal}.xlsx`;
   XLSX.writeFile(wb, fileName);
-  toast('Laporan absensi berhasil didownload', 'success');
+  toast('Laporan absensi harian berhasil didownload', 'success');
+}
+
+export function exportRekapBulananExcel(bulan, tahun, kelasFilter = '') {
+  const siswaList = store.state.siswa
+    .filter(s => !kelasFilter || s.kelas === kelasFilter)
+    .sort((a, b) => a.kelas.localeCompare(b.kelas) || a.nama.localeCompare(b.nama));
+
+  const rows = siswaList.map((s, idx) => {
+    const riwayat = getRiwayatAbsensiSiswa(s.id, bulan, tahun);
+    const hadir = riwayat.filter(r => r.status === 'hadir').length;
+    const terlambat = riwayat.filter(r => r.status === 'terlambat').length;
+    const izin = riwayat.filter(r => r.status === 'izin').length;
+    const sakit = riwayat.filter(r => r.status === 'sakit').length;
+    const alpa = riwayat.filter(r => r.status === 'alpa').length;
+    const duha = riwayat.filter(r => !!r.jamDuha).length;
+    const dzuhur = riwayat.filter(r => !!r.jamDzuhur).length;
+    const totalMasuk = hadir + terlambat;
+
+    return {
+      'No': idx + 1,
+      'Periode': `${String(bulan).padStart(2, '0')}-${tahun}`,
+      'Nama Siswa': s.nama,
+      'Kelas': s.kelas,
+      'NIS': s.nis || '-',
+      'UID RFID': s.rfidUid || '-',
+      'Hadir Tepat Waktu': hadir,
+      'Terlambat': terlambat,
+      'Total Masuk': totalMasuk,
+      'Solat Duha': duha,
+      'Solat Dzuhur': dzuhur,
+      'Izin': izin,
+      'Sakit': sakit,
+      'Alpa': alpa
+    };
+  });
+
+  const ws = XLSX.utils.json_to_sheet(rows);
+  const wb = XLSX.utils.book_new();
+  XLSX.utils.book_append_sheet(wb, ws, 'Rekap Bulanan');
+
+  const fileName = `Rekap_Bulanan_Absensi_${kelasFilter ? kelasFilter.replace(/\s+/g, '_') + '_' : ''}${bulan}_${tahun}.xlsx`;
+  XLSX.writeFile(wb, fileName);
+  toast('Rekap absensi bulanan berhasil didownload', 'success');
 }
 
 export function formatWaLinkAbsensi(siswa, record) {
-  if (!siswa || !siswa.noHp) return null;
+  if (!siswa || !siswa.noHp || !record) return null;
   const sekolah = store.state?.settings?.namaSekolah || 'Sekolah';
-  const waktu = record.jamPulang ? `Pulang pukul ${formatTimeDisplay(record.jamPulang)}` : `Masuk pukul ${formatTimeDisplay(record.jamMasuk)}`;
   const statusTxt = record.status === 'hadir' ? 'Tepat Waktu' : record.status === 'terlambat' ? 'Terlambat' : record.status === 'izin' ? 'Izin' : record.status === 'sakit' ? 'Sakit' : 'Alpa';
 
-  const teks = `*NOTIFIKASI KEHADIRAN SISWA*
+  const waktuLines = [];
+  if (record.jamMasuk) waktuLines.push(`• Masuk : ${formatTimeDisplay(record.jamMasuk)}`);
+  if (record.jamPulang) waktuLines.push(`• Pulang : ${formatTimeDisplay(record.jamPulang)}`);
+  if (record.jamDuha) waktuLines.push(`• Solat Duha : ${formatTimeDisplay(record.jamDuha)}`);
+  if (record.jamDzuhur) waktuLines.push(`• Solat Dzuhur : ${formatTimeDisplay(record.jamDzuhur)}`);
+
+  const teks = `*NOTIFIKASI KEHADIRAN & IBADAH SISWA*
 *${sekolah.toUpperCase()}*
 ------------------------------------------------------
 Yth. Bapak/Ibu Wali Murid dari *${siswa.nama}*,
 
-Menginformasikan bahwa ananda telah tercatat melakukan absensi di sekolah dengan rincian:
+Menginformasikan catatan kehadiran ananda di sekolah dengan rincian:
 
 📋 *Data Siswa*
 Nama  : ${siswa.nama}
 Kelas : ${siswa.kelas}
 NIS   : ${siswa.nis || '-'}
 
-⏰ *Waktu & Status*
+⏰ *Waktu & Status Kehadiran*
 Tanggal : ${parseLocalDate(record.tanggal).toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
-Waktu   : ${waktu}
 Status  : *${statusTxt.toUpperCase()}* ${record.keterangan ? `(${record.keterangan})` : ''}
+${waktuLines.length > 0 ? waktuLines.join('\n') : ''}
 
 ------------------------------------------------------
 Terima kasih atas perhatian dan kerja sama Bapak/Ibu.
-_Sistem Absensi Otomatis ${sekolah}_`;
+_Sistem Absensi Terpadu ${sekolah}_`;
 
   let hp = String(siswa.noHp).replace(/[^0-9]/g, '');
   if (hp.startsWith('0')) hp = '62' + hp.substring(1);

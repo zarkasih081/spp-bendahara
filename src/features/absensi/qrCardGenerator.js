@@ -115,7 +115,8 @@ export async function downloadStudentQrCardPng(siswa) {
 
   ctx.fillStyle = '#64748B';
   ctx.font = '500 11px IBM Plex Mono, monospace';
-  ctx.fillText(`ID: ${siswa.id.slice(0, 10).toUpperCase()} • Sistem EduPass`, canvas.width / 2, 722);
+  const serialLabel = siswa.rfidUid ? `RFID UID: ${siswa.rfidUid}` : `ID: ${siswa.id.slice(0, 10).toUpperCase()}`;
+  ctx.fillText(`${serialLabel} • Sistem EduPass`, canvas.width / 2, 722);
 
   const a = document.createElement('a');
   a.href = canvas.toDataURL('image/png');
@@ -129,6 +130,9 @@ export async function renderStudentCardHtml(siswa, options = {}) {
   const namaSekolah = settings.namaSekolah || 'Sekolah';
   const tahunAjaran = settings.tahunAjaran || '';
   const initials = getStudentInitials(siswa.nama);
+  const rfidBadge = siswa.rfidUid
+    ? `RFID: ${escapeHtml(siswa.rfidUid)}`
+    : `ID: ${siswa.id.slice(0, 10).toUpperCase()}`;
 
   return `
     <div class="id-card ${options.side === 'back' ? 'back' : 'front'}" id="id-card-${siswa.id}">
@@ -142,10 +146,10 @@ export async function renderStudentCardHtml(siswa, options = {}) {
           </div>
           <div class="id-card-school">
             <div class="school-name">${escapeHtml(namaSekolah)}</div>
-            <div class="card-subtitle">KARTU IDENTITAS SISWA</div>
+            <div class="card-subtitle">KARTU IDENTITAS & PRESENSI SISWA</div>
           </div>
-          <div class="id-card-chip">
-            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="#FCD34D" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 9h6M14 12h4M14 15h6"/></svg>
+          <div class="id-card-chip" title="${siswa.rfidUid ? 'Kartu RFID 125KHz Terdaftar' : 'QR Presensi Aktif'}">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="${siswa.rfidUid ? '#34D399' : '#FCD34D'}" stroke-width="1.8"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 9h6M14 12h4M14 15h6"/></svg>
           </div>
         </div>
 
@@ -177,13 +181,13 @@ export async function renderStudentCardHtml(siswa, options = {}) {
 
           <div class="id-card-qr-box">
             <img src="${qrDataUrl}" alt="QR Code" class="id-card-qr-img">
-            <span class="qr-sub">SCAN ABSEN</span>
+            <span class="qr-sub">RFID / QR</span>
           </div>
         </div>
 
         <div class="id-card-footer">
-          <div class="id-card-serial">ID: ${siswa.id.slice(0, 10).toUpperCase()}</div>
-          <div class="id-card-note">Gunakan untuk tap absensi & administrasi sekolah</div>
+          <div class="id-card-serial">${rfidBadge}</div>
+          <div class="id-card-note">Tap Kartu RFID / Scan QR di Gerbang</div>
         </div>
       </div>
     </div>
