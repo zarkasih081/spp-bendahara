@@ -34,9 +34,11 @@ export function renderRiwayat(){
     const filteredPayments = payments.filter(p => {
       if (jenisFilter === 'spp') return !p.jenis || p.jenis === 'spp';
       if (jenisFilter === 'ijazah') return p.jenis === 'ijazah';
+      if (jenisFilter === 'lainnya') return p.jenis && p.jenis !== 'spp' && p.jenis !== 'ijazah';
       return true;
     });
     const ijazahTerbayar = payments.filter(p=>p.jenis==='ijazah').reduce((sum, p)=>sum+p.nominal, 0);
+    const lainnyaCount = payments.filter(p => p.jenis && p.jenis !== 'spp' && p.jenis !== 'ijazah').length;
     const cur = currentPeriodeEntry();
 
     el.innerHTML = `
@@ -237,18 +239,30 @@ export function renderRiwayat(){
             <button type="button" class="tab-btn ${jenisFilter === 'all' ? 'active' : ''}" data-st-jenis="all" style="padding:5px 12px; font-size:12px;">Semua (${payments.length})</button>
             <button type="button" class="tab-btn ${jenisFilter === 'spp' ? 'active' : ''}" data-st-jenis="spp" style="padding:5px 12px; font-size:12px;">SPP</button>
             <button type="button" class="tab-btn ${jenisFilter === 'ijazah' ? 'active' : ''}" data-st-jenis="ijazah" style="padding:5px 12px; font-size:12px;">Ijazah</button>
+            ${lainnyaCount > 0 ? `<button type="button" class="tab-btn ${jenisFilter === 'lainnya' ? 'active' : ''}" data-st-jenis="lainnya" style="padding:5px 12px; font-size:12px;">Tagihan Lain (${lainnyaCount})</button>` : ''}
           </div>
         </div>
         ${filteredPayments.length === 0 ? '<div class="empty-state" style="padding:28px;">Belum ada transaksi pembayaran pada kategori ini.</div>' : `
           <div class="transaction-list" style="margin-top:12px;">
-            ${filteredPayments.map(p => `
+            ${filteredPayments.map(p => {
+              let posNama = 'SPP';
+              if (p.jenis === 'ijazah') {
+                posNama = 'Pembayaran Ijazah';
+              } else if (!p.jenis || p.jenis === 'spp') {
+                posNama = 'SPP Bulan ' + BULAN[(p.bulan||1)-1] + ' ' + (p.tahun||'');
+              } else {
+                const foundPos = (store.state.posTagihan || []).find(x => x.id === p.jenis);
+                posNama = foundPos ? foundPos.nama : (p.namaTagihan || 'Tagihan Lainnya');
+              }
+
+              return `
               <div class="transaction-item">
                 <div class="ti-left">
-                  <div class="ti-icon" style="${p.jenis === 'ijazah' ? 'background:rgba(59,130,246,0.12); color:#2563EB;' : ''}">
+                  <div class="ti-icon" style="${p.jenis === 'ijazah' ? 'background:rgba(59,130,246,0.12); color:#2563EB;' : (p.jenis && p.jenis !== 'spp' ? 'background:rgba(16,185,129,0.12); color:#059669;' : '')}">
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"></polyline></svg>
                   </div>
                   <div>
-                    <div class="ti-title">${(!p.jenis || p.jenis === 'spp') ? 'SPP Bulan ' + BULAN[(p.bulan||1)-1] + ' ' + (p.tahun||'') : 'Pembayaran Ijazah'}</div>
+                    <div class="ti-title">${escapeHtml(posNama)}</div>
                     <div class="ti-date">
                       ${parseLocalDate(p.tanggal).toLocaleDateString('id-ID', {day:'numeric', month:'long', year:'numeric'})}
                       ${p.noKwitansi ? ` • <span class="monospace" style="color:var(--primary); font-weight:600;">${escapeHtml(p.noKwitansi)}</span>` : ''}
@@ -263,7 +277,8 @@ export function renderRiwayat(){
                   </button>
                 </div>
               </div>
-            `).join('')}
+            `;
+            }).join('')}
           </div>
         `}
       </div>
@@ -309,6 +324,21 @@ export function renderRiwayat(){
       const sisaIjazah = Math.max(0, (settings.nominalIjazah || 500000) - ijazahTerbayar);
       const targetPhone = s.noHp || s.telepon || '';
 
+      const posList = store.state.posTagihan || [];
+      let rincianPosLain = '';
+      let totalSisaPos = 0;
+      if (posList.length > 0) {
+        rincianPosLain = `\n*3. Kewajiban & Tagihan Sekolah Lainnya:*\n`;
+        posList.forEach(pos => {
+          const terbayar = payments.filter(p => p.jenis === pos.id).reduce((sum, p) => sum + p.nominal, 0);
+          const sisa = Math.max(0, pos.nominal - terbayar);
+          totalSisaPos += sisa;
+          rincianPosLain += `  • ${pos.nama} : Ketetapan ${fmtRupiah(pos.nominal)} | Sisa ${sisa > 0 ? fmtRupiah(sisa) : 'Lunas'}\n`;
+        });
+      }
+
+      const totalKewajiban = t.totalKurang + sisaIjazah + totalSisaPos;
+
       const pesanWa = `*RINCIAN TAGIHAN & KEUANGAN SISWA*\n` +
         `Sekolah: *${settings.namaSekolah}*\n` +
         `Tahun Ajaran: ${activeTaStart}/${activeTaStart+1}\n\n` +
@@ -321,8 +351,9 @@ export function renderRiwayat(){
         `*2. Tabungan Administrasi Ijazah:*\n` +
         `  • Ketetapan : ${fmtRupiah(settings.nominalIjazah || 500000)}\n` +
         `  • Terbayar  : ${fmtRupiah(ijazahTerbayar)}\n` +
-        `  • Sisa      : *${fmtRupiah(sisaIjazah)}*\n\n` +
-        `*TOTAL KEWAJIBAN: ${fmtRupiah(t.totalKurang + sisaIjazah)}*\n\n` +
+        `  • Sisa      : *${fmtRupiah(sisaIjazah)}*\n` +
+        `${rincianPosLain}\n` +
+        `*TOTAL SELURUH KEWAJIBAN: ${fmtRupiah(totalKewajiban)}*\n\n` +
         `*Rekening Resmi Pembayaran:*\n` +
         `Bank       : ${settings.namaBank || 'Bank BRI / BSI'}\n` +
         `No. Rek    : *${settings.noRekening || '0123-01-000000-50-0'}*\n` +

@@ -724,13 +724,21 @@ function exportLaporanCsv(rows){
   const csvRows = [headers.join(',')];
   rows.forEach(r => {
     const s = store.state.siswa.find(x => x.id === r.siswaId) || { nama: '(dihapus)', kelas: '-', nis: '-' };
+    let jNama = 'SPP';
+    if (r.jenis === 'ijazah') jNama = 'Ijazah';
+    else if (!r.jenis || r.jenis === 'spp') jNama = `SPP (${BULAN[(r.bulan||1)-1]} ${r.tahun||''})`;
+    else {
+      const pos = (store.state.posTagihan || []).find(x => x.id === r.jenis);
+      jNama = pos ? pos.nama : (r.namaTagihan || r.jenis);
+    }
+
     csvRows.push([
       `"${r.tanggal}"`,
       `"${s.nama.replace(/"/g, '""')}"`,
       `"${s.kelas}"`,
       `"${s.nis || '-'}"`,
       `"${r.noKwitansi || '-'}"`,
-      `"${r.jenis || 'spp'}"`,
+      `"${jNama}"`,
       r.nominal
     ].join(','));
   });
@@ -745,7 +753,10 @@ function exportLaporanExcel(rows){
     let jenisStr = 'SPP';
     if (r.jenis === 'ijazah') jenisStr = 'Ijazah';
     else if (!r.jenis || r.jenis === 'spp') jenisStr = `SPP (${BULAN[(r.bulan||1)-1]} ${r.tahun||''})`;
-    else jenisStr = r.namaTagihan || r.jenis;
+    else {
+      const pos = (store.state.posTagihan || []).find(x => x.id === r.jenis);
+      jenisStr = pos ? pos.nama : (r.namaTagihan || r.jenis);
+    }
 
     return {
       'No': i + 1,

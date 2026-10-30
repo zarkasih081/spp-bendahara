@@ -179,3 +179,4 @@ export function exportPengeluaranExcel(pengeluaranList, periodeLabel) {
   XLSX.utils.book_append_sheet(wb, ws, 'Pengeluaran Kas');
   XLSX.writeFile(wb, `Pengeluaran_Kas_${(periodeLabel || 'Semua').replace(/\s+/g, '_')}.xlsx`);
 }
+

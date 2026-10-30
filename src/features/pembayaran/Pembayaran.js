@@ -385,6 +385,13 @@ function renderBayarRiwayat(siswa){
 }
 
 function simpanPembayaran(nominalSPP){
+  const activeTa = getActiveTahunMulai();
+  const isTaLocked = (store.state.settings.tahunAjaranTerkunci || []).includes(activeTa);
+  if (isTaLocked) {
+    toast(`Tahun Ajaran ${activeTa}/${activeTa+1} terkunci (Arsip Resmi). Transaksi baru tidak dapat disimpan.`, 'error');
+    return;
+  }
+
   const siswa = store.state.siswa.find(s=>s.id===store.ui.bayarSiswaId);
   const inNominal = document.getElementById('bayar-nominal');
   const inTanggal = document.getElementById('bayar-tanggal');
