@@ -6,7 +6,21 @@ import { openModal } from '../../components/Modal.js';
 
 export function cetakKwitansi(siswa, months, nominal, noKwitansi, tanggal, jenis) {
   const s = store.state.settings;
-  const itemText = jenis === 'spp' ? 'SPP Bulan ' + months.map(m => `${BULAN[m.bulan-1]} ${m.tahun}`).join(', ') : 'Pembayaran Ijazah';
+  let titleKwitansi = 'KUITANSI PEMBAYARAN SPP';
+  let itemText = '';
+
+  if (jenis === 'spp') {
+    titleKwitansi = 'KUITANSI PEMBAYARAN SPP';
+    itemText = 'SPP Bulan ' + months.map(m => `${BULAN[m.bulan-1]} ${m.tahun}`).join(', ');
+  } else if (jenis === 'ijazah') {
+    titleKwitansi = 'KUITANSI PEMBAYARAN IJAZAH';
+    itemText = 'Pembayaran Tabungan Ijazah';
+  } else {
+    const pos = (store.state.posTagihan || []).find(x => x.id === jenis);
+    const namaTagihan = pos ? pos.nama : (jenis || 'Administrasi');
+    titleKwitansi = `KUITANSI PEMBAYARAN ${namaTagihan.toUpperCase()}`;
+    itemText = `Pembayaran ${namaTagihan}`;
+  }
   
   const area = document.getElementById('kwitansi-print-area');
   area.innerHTML = `
@@ -16,13 +30,13 @@ export function cetakKwitansi(siswa, months, nominal, noKwitansi, tanggal, jenis
         <div class="sekolah">${escapeHtml(s.namaSekolah)}</div>
         <div class="ta">Tahun Ajaran ${escapeHtml(s.tahunAjaran)}</div>
       </div>
-      <div class="receipt-title">${jenis === 'spp' ? 'KUITANSI PEMBAYARAN SPP' : 'KUITANSI PEMBAYARAN IJAZAH'}</div>
+      <div class="receipt-title">${escapeHtml(titleKwitansi)}</div>
       <div class="receipt-row"><span class="k">No. Kuitansi</span><span class="v">${noKwitansi}</span></div>
       <div class="receipt-row"><span class="k">Tanggal</span><span class="v">${fmtDate(tanggal)}</span></div>
       <div class="receipt-row"><span class="k">Nama Siswa</span><span class="v">${escapeHtml(siswa.nama)}</span></div>
       <div class="receipt-row"><span class="k">Kelas</span><span class="v">${escapeHtml(siswa.kelas)}</span></div>
       <div class="receipt-row"><span class="k">NIS</span><span class="v">${escapeHtml(siswa.nis||'-')}</span></div>
-      <div class="receipt-row"><span class="k">Pembayaran</span><span class="v">${itemText}</span></div>
+      <div class="receipt-row"><span class="k">Pembayaran</span><span class="v">${escapeHtml(itemText)}</span></div>
       <div class="receipt-amt">
         <div class="lbl">Jumlah Dibayar</div>
         <div class="amt">${fmtRupiah(nominal)}</div>
@@ -34,10 +48,10 @@ export function cetakKwitansi(siswa, months, nominal, noKwitansi, tanggal, jenis
       <div class="receipt-foot">Kuitansi digital ini merupakan bukti pembayaran yang sah untuk keperluan arsip.</div>
     </div>
   `;
-  openKwitansiModal(noKwitansi, siswa, itemText, nominal, tanggal, jenis);
+  openKwitansiModal(noKwitansi, siswa, itemText, nominal, tanggal, jenis, titleKwitansi);
 }
 
-function openKwitansiModal(noKwitansi, siswa, itemText, nominal, tanggal, jenis) {
+function openKwitansiModal(noKwitansi, siswa, itemText, nominal, tanggal, jenis, titleKwitansi) {
   const hasWa = !!siswa.noHp;
   openModal(`
     <div class="modal-head"><h3>Kuitansi ${noKwitansi}</h3><button class="close-x" id="modal-close">&times;</button></div>
@@ -55,14 +69,14 @@ function openKwitansiModal(noKwitansi, siswa, itemText, nominal, tanggal, jenis)
   
   if(hasWa){
     document.getElementById('btn-wa-kwitansi').addEventListener('click', ()=>{
-      const teks = `*KUITANSI PEMBAYARAN ${jenis==='spp'?'SPP':'IJAZAH'}*
+      const teks = `*${(titleKwitansi || 'KUITANSI PEMBAYARAN').toUpperCase()}*
 *${store.state.settings.namaSekolah.toUpperCase()}*
 ------------------------------------------------------
 
 Kepada Yth. Bapak/Ibu Wali Murid dari *${siswa.nama}*,
 
 Dengan hormat,
-Melalui pesan ini kami menginformasikan bahwa kami telah menerima pembayaran ${jenis==='spp'?'SPP':'Ijazah'} dengan rincian sebagai berikut:
+Melalui pesan ini kami menginformasikan bahwa kami telah menerima pembayaran *${itemText}* dengan rincian sebagai berikut:
 
 *Data Siswa:*
 Nama  : ${siswa.nama}

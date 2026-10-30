@@ -665,13 +665,22 @@ export async function renderDashboard(){
   const cur = currentPeriodeEntry();
   const totalSiswa = store.state.siswa.length;
   
-  const totalSPPMasukBulanIni = store.state.pembayaran
-    .filter(p=>(!p.jenis || p.jenis==='spp') && p.bulan===cur.bulan && p.tahun===cur.tahun)
-    .reduce((a,p)=>a+p.nominal,0);
-    
-  const totalIjazahMasuk = store.state.pembayaran
-    .filter(p=>p.jenis==='ijazah')
-    .reduce((a,p)=>a+p.nominal,0);
+  // Kas Masuk Bulan Ini (SPP + Ijazah + Lainnya)
+  const pembayaranBulanIni = store.state.pembayaran.filter(p => {
+    const pBulan = p.bulan || (p.tanggal ? new Date(p.tanggal).getMonth() + 1 : null);
+    const pTahun = p.tahun || (p.tanggal ? new Date(p.tanggal).getFullYear() : null);
+    return pBulan === cur.bulan && pTahun === cur.tahun;
+  });
+  const totalMasukBulanIni = pembayaranBulanIni.reduce((a,p) => a + p.nominal, 0);
+
+  // Kas Keluar Bulan Ini
+  const allPengeluaran = store.state.pengeluaran || [];
+  const pengeluaranBulanIni = allPengeluaran.filter(e => {
+    const d = new Date(e.tanggal);
+    return (d.getMonth() + 1) === cur.bulan && d.getFullYear() === cur.tahun;
+  });
+  const totalKeluarBulanIni = pengeluaranBulanIni.reduce((a,e) => a + e.nominal, 0);
+  const saldoBersihBulanIni = totalMasukBulanIni - totalKeluarBulanIni;
 
   let lunasCount = 0, parsialCount = 0, nunggakCount = 0;
   store.state.siswa.forEach(s=>{
@@ -688,8 +697,23 @@ export async function renderDashboard(){
     const d = new Date(now.getFullYear(), now.getMonth()-i, 1);
     months.push({ bulan: d.getMonth()+1, tahun: d.getFullYear() });
   }
-  const totals = months.map(m => store.state.pembayaran.filter(p=>(!p.jenis || p.jenis==='spp') && p.bulan===m.bulan && p.tahun===m.tahun).reduce((a,p)=>a+p.nominal,0));
-  const maxTotal = Math.max(...totals, 1);
+
+  const incomeTotals = months.map(m => {
+    return store.state.pembayaran.filter(p => {
+      const pBulan = p.bulan || (p.tanggal ? new Date(p.tanggal).getMonth() + 1 : null);
+      const pTahun = p.tahun || (p.tanggal ? new Date(p.tanggal).getFullYear() : null);
+      return pBulan === m.bulan && pTahun === m.tahun;
+    }).reduce((sum, p) => sum + p.nominal, 0);
+  });
+
+  const expenseTotals = months.map(m => {
+    return allPengeluaran.filter(e => {
+      const d = new Date(e.tanggal);
+      return (d.getMonth() + 1) === m.bulan && d.getFullYear() === m.tahun;
+    }).reduce((sum, e) => sum + e.nominal, 0);
+  });
+
+  const maxVal = Math.max(...incomeTotals, ...expenseTotals, 1);
   const absenStatsToday = getStatistikAbsensi(getTodayDateStr());
 
   if(totalSiswa===0){
@@ -700,16 +724,31 @@ export async function renderDashboard(){
     return;
   }
 
+  // Calculate Donut Chart SVG params
+  const totalDonut = lunasCount + parsialCount + nunggakCount || 1;
+  const pLunas = (lunasCount / totalDonut) * 100;
+  const pParsial = (parsialCount / totalDonut) * 100;
+  const pNunggak = (nunggakCount / totalDonut) * 100;
+  const rCirc = 38;
+  const circLen = 2 * Math.PI * rCirc;
+  const dashLunas = (pLunas / 100) * circLen;
+  const dashParsial = (pParsial / 100) * circLen;
+  const dashNunggak = (pNunggak / 100) * circLen;
+
   el.innerHTML = `
     <!-- Quick Actions Bar for Bendahara -->
     <div style="display:flex; gap:10px; margin-bottom:22px; flex-wrap:wrap;">
       <button class="btn btn-primary" id="btn-quick-bayar" style="display:inline-flex; align-items:center; gap:8px; padding:10px 18px; border-radius:12px; font-weight:600; box-shadow:0 4px 12px rgba(51,53,148,0.25);">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
-        <span>Input Pembayaran SPP</span>
+        <span>Input Pembayaran Siswa</span>
       </button>
       <button class="btn" id="btn-quick-absensi" style="display:inline-flex; align-items:center; gap:8px; padding:10px 18px; border-radius:12px; font-weight:600; background:var(--paper); border:1px solid var(--line); color:var(--ink);">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
         <span>Buka Scanner Presensi</span>
+      </button>
+      <button class="btn" id="btn-quick-pengeluaran" style="display:inline-flex; align-items:center; gap:8px; padding:10px 18px; border-radius:12px; font-weight:600; background:var(--paper); border:1px solid var(--line); color:var(--ink);">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
+        <span>Buku Kas Keluar (BKK)</span>
       </button>
       <button class="btn" id="btn-quick-siswa" style="display:inline-flex; align-items:center; gap:8px; padding:10px 18px; border-radius:12px; font-weight:600; background:var(--paper); border:1px solid var(--line); color:var(--ink);">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6.2 6.5-6.2s6.5 2.6 6.5 6.2"/><circle cx="17" cy="8.5" r="2.6"/><path d="M15.5 13.5c2.9.3 5 2.6 5 6.2"/></svg>
@@ -717,30 +756,102 @@ export async function renderDashboard(){
       </button>
     </div>
 
+    <!-- 4 KPI Arus Kas Riil & Piutang -->
     <div class="stat-row">
-      <div class="stat-card gold">
-        <div class="stat-icon">${iconMoney()}</div>
-        <div class="label">SPP Masuk Bulan ${BULAN[cur.bulan-1]}</div>
-        <div class="value">${fmtRupiah(totalSPPMasukBulanIni)}</div>
-        <div class="foot">Bulan berjalan (${cur.tahun})</div>
-      </div>
       <div class="stat-card emerald">
         <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
-        <div class="label">Total Ijazah Masuk</div>
-        <div class="value">${fmtRupiah(totalIjazahMasuk)}</div>
-        <div class="foot">Akumulasi seluruhnya</div>
+        <div class="label">Pemasukan Kas Bulan Ini</div>
+        <div class="value" style="color:#059669;">${fmtRupiah(totalMasukBulanIni)}</div>
+        <div class="foot">SPP & administrasi ${BULAN[cur.bulan-1]}</div>
       </div>
       <div class="stat-card rust">
-        <div class="stat-icon">${iconAlertTri()}</div>
-        <div class="label">Belum / Kurang Bayar</div>
-        <div class="value">${nunggakCount+parsialCount} Siswa</div>
-        <div class="foot">${nunggakCount} belum bayar · ${parsialCount} sebagian</div>
+        <div class="stat-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+        <div class="label">Pengeluaran Kas Bulan Ini</div>
+        <div class="value" style="color:#DC2626;">${fmtRupiah(totalKeluarBulanIni)}</div>
+        <div class="foot">${pengeluaranBulanIni.length} transaksi kas keluar</div>
+      </div>
+      <div class="stat-card gold">
+        <div class="stat-icon">${iconMoney()}</div>
+        <div class="label">Saldo Kas Bersih Bulan Ini</div>
+        <div class="value" style="color:${saldoBersihBulanIni >= 0 ? 'var(--primary)' : '#DC2626'};">${fmtRupiah(saldoBersihBulanIni)}</div>
+        <div class="foot">Pemasukan dikurangi Pengeluaran</div>
       </div>
       <div class="stat-card rust">
         <div class="stat-icon">${iconWallet()}</div>
-        <div class="label">Total Piutang Berjalan</div>
+        <div class="label">Total Tunggakan SPP</div>
         <div class="value">${fmtRupiah(totalPiutang)}</div>
-        <div class="foot">Akumulasi tunggakan SPP</div>
+        <div class="foot">${nunggakCount + parsialCount} siswa belum lunas</div>
+      </div>
+    </div>
+
+    <!-- Dual Visual Analytics Charts -->
+    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:18px; margin-bottom:24px;">
+      <!-- Chart 1: Dual-Bar Cashflow -->
+      <div class="card" style="margin-bottom:0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+          <div>
+            <h3 style="margin:0; font-size:15px;">Arus Kas 6 Bulan Terakhir</h3>
+            <div class="card-sub">Perbandingan Pemasukan vs Pengeluaran kas</div>
+          </div>
+          <div style="display:flex; align-items:center; gap:12px; font-size:11.5px; font-weight:600;">
+            <span style="display:flex; align-items:center; gap:4px; color:#059669;"><span style="width:8px; height:8px; border-radius:2px; background:#10B981;"></span> Masuk</span>
+            <span style="display:flex; align-items:center; gap:4px; color:#DC2626;"><span style="width:8px; height:8px; border-radius:2px; background:#EF4444;"></span> Keluar</span>
+          </div>
+        </div>
+        <div class="chart-wrap" style="height:170px; display:flex; align-items:flex-end; gap:8px; padding-top:14px;">
+          ${months.map((m, i) => {
+            const hIn = Math.max(4, Math.round((incomeTotals[i] / maxVal) * 100));
+            const hOut = Math.max(4, Math.round((expenseTotals[i] / maxVal) * 100));
+            return `
+              <div style="flex:1; display:flex; flex-direction:column; align-items:center; height:100%; justify-content:flex-end;">
+                <div style="display:flex; align-items:flex-end; gap:3px; height:120px; width:100%; justify-content:center;">
+                  <div style="width:42%; max-width:20px; height:${hIn}%; background:#10B981; border-radius:4px 4px 0 0;" title="Pemasukan ${BULAN[m.bulan-1]}: ${fmtRupiah(incomeTotals[i])}"></div>
+                  <div style="width:42%; max-width:20px; height:${hOut}%; background:#EF4444; border-radius:4px 4px 0 0;" title="Pengeluaran ${BULAN[m.bulan-1]}: ${fmtRupiah(expenseTotals[i])}"></div>
+                </div>
+                <span style="font-size:10.5px; color:var(--ink-soft); font-weight:600; margin-top:6px;">${BULAN[m.bulan-1].slice(0,3)}</span>
+              </div>
+            `;
+          }).join('')}
+        </div>
+      </div>
+
+      <!-- Chart 2: Donut Kepatuhan SPP -->
+      <div class="card" style="margin-bottom:0;">
+        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:10px;">
+          <div>
+            <h3 style="margin:0; font-size:15px;">Rasio Kepatuhan SPP Siswa</h3>
+            <div class="card-sub">Status pembayaran siswa bulan ${BULAN[cur.bulan-1]}</div>
+          </div>
+          <span class="badge" style="background:var(--paper-dim); color:var(--ink);">${totalSiswa} Siswa</span>
+        </div>
+        <div style="display:flex; align-items:center; gap:20px; flex-wrap:wrap; justify-content:center; padding:10px 0;">
+          <div style="position:relative; width:120px; height:120px; flex-shrink:0;">
+            <svg viewBox="0 0 100 100" width="120" height="120" style="transform:rotate(-90deg);">
+              <circle cx="50" cy="50" r="${rCirc}" fill="none" stroke="var(--paper-dim)" stroke-width="12" />
+              ${dashLunas > 0 ? `<circle cx="50" cy="50" r="${rCirc}" fill="none" stroke="#10B981" stroke-width="12" stroke-dasharray="${dashLunas} ${circLen}" stroke-dashoffset="0" stroke-linecap="round" />` : ''}
+              ${dashParsial > 0 ? `<circle cx="50" cy="50" r="${rCirc}" fill="none" stroke="#F59E0B" stroke-width="12" stroke-dasharray="${dashParsial} ${circLen}" stroke-dashoffset="${-dashLunas}" stroke-linecap="round" />` : ''}
+              ${dashNunggak > 0 ? `<circle cx="50" cy="50" r="${rCirc}" fill="none" stroke="#EF4444" stroke-width="12" stroke-dasharray="${dashNunggak} ${circLen}" stroke-dashoffset="${-(dashLunas + dashParsial)}" stroke-linecap="round" />` : ''}
+            </svg>
+            <div style="position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; text-align:center;">
+              <span style="font-size:18px; font-weight:800; font-family:'IBM Plex Mono', monospace; color:var(--ink);">${pLunas.toFixed(0)}%</span>
+              <span style="font-size:9.5px; color:var(--ink-soft); text-transform:uppercase; font-weight:600;">Lunas</span>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:8px; min-width:140px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px;">
+              <span style="display:flex; align-items:center; gap:6px;"><span style="width:9px; height:9px; border-radius:50%; background:#10B981;"></span> Lunas</span>
+              <strong>${lunasCount} <span style="font-size:11px; color:var(--ink-soft); font-weight:400;">(${pLunas.toFixed(0)}%)</span></strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px;">
+              <span style="display:flex; align-items:center; gap:6px;"><span style="width:9px; height:9px; border-radius:50%; background:#F59E0B;"></span> Sebagian</span>
+              <strong>${parsialCount} <span style="font-size:11px; color:var(--ink-soft); font-weight:400;">(${pParsial.toFixed(0)}%)</span></strong>
+            </div>
+            <div style="display:flex; justify-content:space-between; align-items:center; font-size:12.5px;">
+              <span style="display:flex; align-items:center; gap:6px;"><span style="width:9px; height:9px; border-radius:50%; background:#EF4444;"></span> Belum Bayar</span>
+              <strong>${nunggakCount} <span style="font-size:11px; color:var(--ink-soft); font-weight:400;">(${pNunggak.toFixed(0)}%)</span></strong>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -773,33 +884,6 @@ export async function renderDashboard(){
       </div>
     </div>
 
-    <div class="card" style="margin-bottom:24px;">
-      <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
-        <div>
-          <h3 style="margin:0;">Tren Pemasukan 6 Bulan Terakhir</h3>
-          <div class="card-sub">Total SPP diterima per bulan</div>
-        </div>
-        ${totals.some(t => t > 0) ? `<span style="font-size:12px; font-weight:600; color:var(--ink-soft);">Tertinggi: ${fmtRupiah(maxTotal)}</span>` : ''}
-      </div>
-      ${totals.every(t => t === 0) ? `
-        <div style="text-align:center; padding:32px 16px; background:var(--paper-dim); border-radius:12px; border:1px dashed var(--line); color:var(--ink-soft);">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" style="width:36px;height:36px;margin-bottom:8px;opacity:0.6;"><path d="M4 20V10M12 20V4M20 20v-7"/></svg>
-          <div style="font-size:14px; font-weight:600; color:var(--ink); margin-bottom:4px;">Belum Ada Riwayat Pemasukan 6 Bulan Ini</div>
-          <div style="font-size:12.5px; margin-bottom:14px;">Catat setoran pembayaran SPP siswa pertama Anda untuk melihat grafik pertumbuhan pemasukan.</div>
-          <button class="btn btn-primary" id="btn-chart-bayar" style="font-size:12.5px; padding:6px 16px; border-radius:8px;">+ Catat Pembayaran Sekarang</button>
-        </div>
-      ` : `
-        <div class="chart-wrap">
-          ${months.map((m,i)=>`
-            <div class="bar-col">
-              <span class="amt">${totals[i]>0? fmtRupiah(totals[i]).replace('Rp',''):''}</span>
-              <div class="bar" style="height:${Math.max(6, totals[i]/maxTotal*100)}%"></div>
-              <span class="lbl">${BULAN[m.bulan-1].slice(0,3)}</span>
-            </div>`).join('')}
-        </div>
-      `}
-    </div>
-
     <div class="card">
       <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:12px;">
         <div>
@@ -817,6 +901,11 @@ export async function renderDashboard(){
   // Quick action listeners
   document.getElementById('btn-quick-bayar')?.addEventListener('click', () => {
     store.ui.page = 'bayar';
+    triggerRender();
+  });
+  document.getElementById('btn-quick-pengeluaran')?.addEventListener('click', () => {
+    store.ui.laporanViewMode = 'pengeluaran';
+    store.ui.page = 'laporan';
     triggerRender();
   });
   document.getElementById('btn-chart-bayar')?.addEventListener('click', () => {

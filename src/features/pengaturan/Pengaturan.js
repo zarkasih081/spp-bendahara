@@ -3,8 +3,8 @@ import { defaultState, saveData } from '../../data/database.js';
 import { hashPassword } from '../../data/authStorage.js';
 import { triggerRender } from '../../utils/events.js';
 import { BULAN, toast, downloadFile } from '../../utils/helpers.js';
-import { escapeAttr } from '../../utils/formatters.js';
-import { openConfirm } from '../../components/Modal.js';
+import { escapeHtml, escapeAttr, fmtRupiah } from '../../utils/formatters.js';
+import { openConfirm, openModal, closeModal } from '../../components/Modal.js';
 
 export function renderPengaturan(){
   const el = document.getElementById('page-pengaturan');
@@ -28,9 +28,15 @@ export function renderPengaturan(){
   const siswaCount = (store.state.siswa || []).length;
   const bayarCount = (store.state.pembayaran || []).length;
   const absensiCount = (store.state.absensi || []).length;
+  const pengeluaranCount = (store.state.pengeluaran || []).length;
+
+  const posTagihanList = store.state.posTagihan || [];
+  const lockedYears = s.tahunAjaranTerkunci || [];
+  const currentTaMulai = s.tahunMulai || new Date().getFullYear();
+  const availableYears = [currentTaMulai - 2, currentTaMulai - 1, currentTaMulai, currentTaMulai + 1];
 
   el.innerHTML = `
-    <div class="card" style="max-width:560px;">
+    <div class="card" style="max-width:580px;">
       <h3>Identitas Sekolah & Pimpinan</h3>
       <div class="card-sub">Digunakan pada kwitansi resmi, kartu pelajar digital, dan laporan kas</div>
       <div class="form-group"><label>Nama Sekolah / Madrasah</label><input id="set-nama" style="width:100%;" value="${escapeAttr(s.namaSekolah)}"></div>
@@ -69,8 +75,81 @@ export function renderPengaturan(){
         <div class="helper-text">Digunakan untuk login sebagai Bendahara.</div>
       </div>
     </div>
-    <div class="card" style="max-width:560px;">
-      <h3>Nominal & Periode</h3>
+
+    <!-- Pos Tagihan Sekolah Lainnya (Non-SPP) -->
+    <div class="card" style="max-width:580px;">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
+        <div>
+          <h3 style="margin:0;">Pengaturan Pos Tagihan Sekolah (Non-SPP)</h3>
+          <div class="card-sub" style="margin-top:2px;">Uang gedung, seragam, ujian, dan administrasi tambahan</div>
+        </div>
+        <button type="button" class="btn btn-sm btn-primary" id="btn-tambah-pos-tagihan" style="display:inline-flex; align-items:center; gap:5px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+          Tambah Pos Tagihan
+        </button>
+      </div>
+
+      <div style="border:1px solid var(--line); border-radius:10px; overflow:hidden;">
+        <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+          <thead>
+            <tr style="background:var(--paper-dim); border-bottom:1px solid var(--line);">
+              <th style="padding:8px 12px; text-align:left;">Nama Pos Tagihan</th>
+              <th style="padding:8px 12px; text-align:right;">Ketetapan (Rp)</th>
+              <th style="padding:8px 12px; text-align:center; width:70px;">Aksi</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${posTagihanList.length === 0 ? '<tr><td colspan="3" style="padding:16px; text-align:center; color:var(--ink-soft);">Belum ada pos tagihan khusus.</td></tr>' : posTagihanList.map(pos => `
+              <tr style="border-bottom:1px solid var(--line);">
+                <td style="padding:8px 12px;">
+                  <strong>${escapeHtml(pos.nama)}</strong>
+                  <div style="font-size:11px; color:var(--ink-soft);">${pos.tipe === 'sekali' ? 'Sekali Bayar' : 'Per Semester'}</div>
+                </td>
+                <td style="padding:8px 12px; text-align:right; font-family:monospace; font-weight:700; color:var(--primary);">
+                  ${fmtRupiah(pos.nominal)}
+                </td>
+                <td style="padding:8px 12px; text-align:center;">
+                  <button type="button" class="btn btn-sm btn-ghost btn-del-pos" data-pos-id="${pos.id}" title="Hapus Pos Tagihan" style="color:var(--rust); padding:3px 6px;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+                  </button>
+                </td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- Kunci & Arsip Tahun Ajaran Lampau -->
+    <div class="card" style="max-width:580px;">
+      <div style="margin-bottom:12px;">
+        <h3 style="margin:0;">Kunci & Arsip Tahun Ajaran Lampau</h3>
+        <div class="card-sub" style="margin-top:2px;">Kunci tahun ajaran lampau agar tidak dapat ditambah atau diubah secara tidak sengaja (Read-Only)</div>
+      </div>
+
+      <div style="display:flex; flex-direction:column; gap:8px;">
+        ${availableYears.map(yr => {
+          const isLocked = lockedYears.includes(yr);
+          return `
+            <div style="display:flex; justify-content:space-between; align-items:center; background:var(--paper-dim); border:1px solid var(--line); border-radius:10px; padding:10px 14px;">
+              <div>
+                <strong style="font-size:14px;">Tahun Ajaran ${yr}/${yr+1}</strong>
+                <div style="font-size:11.5px; color:${isLocked ? '#DC2626' : '#059669'}; font-weight:600; margin-top:2px;">
+                  ${isLocked ? 'Terkunci (Arsip Resmi / Read-Only)' : 'Aktif (Transaksi Dibuka)'}
+                </div>
+              </div>
+              <button type="button" class="btn btn-sm ${isLocked ? 'btn-outline' : 'btn-secondary'} btn-toggle-lock-ta" data-year="${yr}" style="display:inline-flex; align-items:center; gap:6px;">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+                <span>${isLocked ? 'Buka Kunci' : 'Kunci Tahun Ini'}</span>
+              </button>
+            </div>
+          `;
+        }).join('')}
+      </div>
+    </div>
+
+    <div class="card" style="max-width:580px;">
+      <h3>Nominal SPP & Periode Standar</h3>
       <div class="card-sub">Nominal SPP dan Ijazah berlaku sama untuk semua siswa</div>
       <div class="form-row">
         <div class="form-group"><label>Nominal SPP per Bulan (Rp)</label><input id="set-nominal" type="number" style="width:100%;" value="${s.nominalSPP}"></div>
@@ -84,7 +163,8 @@ export function renderPengaturan(){
         <div class="form-group"><label>Tahun Awal</label><input id="set-tahun-mulai" type="number" style="width:100%;" value="${s.tahunMulai}"></div>
       </div>
     </div>
-    <div class="card" style="max-width:560px;">
+
+    <div class="card" style="max-width:580px;">
       <h3>Jadwal Absensi & Scanner QR</h3>
       <div class="card-sub">Waktu batas keterlambatan dan suara scanner kartu QR</div>
       <div class="form-row">
@@ -106,10 +186,11 @@ export function renderPengaturan(){
         </label>
       </div>
     </div>
+
     <button class="btn btn-primary" id="btn-save-settings">Simpan Pengaturan</button>
 
     <div class="divider"></div>
-    <div class="card" style="max-width:560px;">
+    <div class="card" style="max-width:580px;">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
         <div>
           <h3 style="margin:0;">Status Kapasitas Penyimpanan (LocalStorage)</h3>
@@ -130,7 +211,7 @@ export function renderPengaturan(){
         </div>
       </div>
 
-      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(110px, 1fr)); gap:10px; margin-top:14px;">
+      <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(100px, 1fr)); gap:10px; margin-top:14px;">
         <div style="background:var(--paper-dim); border:1px solid var(--line); border-radius:8px; padding:10px; text-align:center;">
           <div style="font-size:18px; font-weight:800; color:var(--primary);">${siswaCount}</div>
           <div style="font-size:11px; color:var(--ink-soft);">Total Siswa</div>
@@ -138,6 +219,10 @@ export function renderPengaturan(){
         <div style="background:var(--paper-dim); border:1px solid var(--line); border-radius:8px; padding:10px; text-align:center;">
           <div style="font-size:18px; font-weight:800; color:#10B981;">${bayarCount}</div>
           <div style="font-size:11px; color:var(--ink-soft);">Transaksi Kas</div>
+        </div>
+        <div style="background:var(--paper-dim); border:1px solid var(--line); border-radius:8px; padding:10px; text-align:center;">
+          <div style="font-size:18px; font-weight:800; color:#DC2626;">${pengeluaranCount}</div>
+          <div style="font-size:11px; color:var(--ink-soft);">Kas Keluar (BKK)</div>
         </div>
         <div style="background:var(--paper-dim); border:1px solid var(--line); border-radius:8px; padding:10px; text-align:center;">
           <div style="font-size:18px; font-weight:800; color:#6366F1;">${absensiCount}</div>
@@ -150,14 +235,14 @@ export function renderPengaturan(){
       </div>
 
       <div class="helper-text" style="margin-top:12px;">
-        Semua foto profil dikompresi otomatis (max ~25 KB/foto) agar tetap ringan dan hemat kuota browser. Lakukan backup berkala setiap akhir bulan.
+        Semua data transaksi dan foto profil dikompresi otomatis agar ringan dan hemat kuota browser. Lakukan backup berkala setiap akhir bulan.
       </div>
     </div>
 
     <div class="divider"></div>
-    <div class="card" style="max-width:560px;">
+    <div class="card" style="max-width:580px;">
       <h3>Backup & Restore Data</h3>
-      <div class="card-sub">Simpan seluruh data (Siswa, Riwayat, Presensi, Pengaturan) sebagai JSON atau pulihkan dari file.</div>
+      <div class="card-sub">Simpan seluruh data (Siswa, Riwayat, Presensi, Pengeluaran, Pengaturan) sebagai JSON atau pulihkan dari file.</div>
       <div style="display:flex; gap:10px; margin-top:14px; flex-wrap:wrap;">
         <button class="btn btn-primary" id="btn-backup-data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3v12m0 0l-4-4m4 4l4-4M4 19h16"/></svg> Download Backup (JSON)</button>
         <button class="btn" id="btn-restore-data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 21V9m0 0l-4 4m4-4l4 4M4 5h16"/></svg> Restore Backup</button>
@@ -166,12 +251,90 @@ export function renderPengaturan(){
     </div>
 
     <div class="divider"></div>
-    <div class="card" style="max-width:560px; border-color: var(--rust-soft);">
+    <div class="card" style="max-width:580px; border-color: var(--rust-soft);">
       <h3 style="color:var(--rust);">Zona Berbahaya</h3>
       <div class="card-sub">Tindakan berikut tidak bisa dibatalkan</div>
       <button class="btn btn-danger" id="btn-reset-data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/></svg> Hapus Semua Data</button>
     </div>
   `;
+
+  // Toggle Lock Year listeners
+  el.querySelectorAll('.btn-toggle-lock-ta').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const yr = parseInt(btn.dataset.year, 10);
+      if (!s.tahunAjaranTerkunci) s.tahunAjaranTerkunci = [];
+      const idx = s.tahunAjaranTerkunci.indexOf(yr);
+      if (idx !== -1) {
+        s.tahunAjaranTerkunci.splice(idx, 1);
+        toast(`Kunci Tahun Ajaran ${yr}/${yr+1} dibuka`, 'info');
+      } else {
+        s.tahunAjaranTerkunci.push(yr);
+        toast(`Tahun Ajaran ${yr}/${yr+1} berhasil dikunci (Arsip Resmi)`, 'success');
+      }
+      saveData();
+      renderPengaturan();
+    });
+  });
+
+  // Pos Tagihan delete listeners
+  el.querySelectorAll('.btn-del-pos').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const posId = btn.dataset.posId;
+      openConfirm('Hapus pos tagihan ini?', () => {
+        store.state.posTagihan = (store.state.posTagihan || []).filter(x => x.id !== posId);
+        saveData('Pos tagihan berhasil dihapus');
+        renderPengaturan();
+      });
+    });
+  });
+
+  // Pos Tagihan add button
+  document.getElementById('btn-tambah-pos-tagihan')?.addEventListener('click', () => {
+    openModal(`
+      <div class="modal-head">
+        <h3>Tambah Pos Tagihan Sekolah</h3>
+        <button class="close-x" id="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" style="padding:16px;">
+        <div class="form-group">
+          <label>Nama Pos Tagihan</label>
+          <input type="text" id="pos-input-nama" placeholder="cth. Uang Gedung / Infaq Pembangunan" style="width:100%;">
+        </div>
+        <div class="form-group">
+          <label>Nominal Ketetapan (Rp)</label>
+          <input type="number" id="pos-input-nominal" placeholder="cth. 500000" style="width:100%; font-family:monospace; font-weight:700;">
+        </div>
+        <div class="form-group">
+          <label>Tipe Tagihan</label>
+          <select id="pos-input-tipe" style="width:100%;">
+            <option value="sekali">Sekali Bayar (Selama Menjadi Siswa)</option>
+            <option value="semester">Per Semester / Tahunan</option>
+          </select>
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" id="modal-cancel">Batal</button>
+        <button class="btn btn-primary" id="btn-save-new-pos">Simpan Pos Tagihan</button>
+      </div>
+    `);
+
+    document.getElementById('btn-save-new-pos')?.addEventListener('click', () => {
+      const nama = document.getElementById('pos-input-nama')?.value.trim();
+      const nominal = parseInt(document.getElementById('pos-input-nominal')?.value || '0', 10);
+      const tipe = document.getElementById('pos-input-tipe')?.value;
+
+      if (!nama) { toast('Nama pos tagihan wajib diisi', 'warning'); return; }
+      if (!nominal || nominal <= 0) { toast('Nominal tagihan wajib diisi', 'warning'); return; }
+
+      if (!store.state.posTagihan) store.state.posTagihan = [];
+      const id = 'pos-' + Date.now();
+      store.state.posTagihan.push({ id, nama, nominal, tipe });
+      saveData('Pos tagihan berhasil ditambahkan');
+      closeModal();
+      renderPengaturan();
+    });
+  });
+
   document.getElementById('btn-save-settings').addEventListener('click', async ()=>{
     s.namaSekolah = document.getElementById('set-nama').value.trim() || s.namaSekolah;
     s.alamatSekolah = document.getElementById('set-alamat')?.value.trim() || s.alamatSekolah || '';
@@ -199,8 +362,9 @@ export function renderPengaturan(){
     saveData('Pengaturan disimpan');
     triggerRender();
   });
+
   document.getElementById('btn-reset-data').addEventListener('click', ()=>{
-    openConfirm('Hapus SEMUA data siswa dan pembayaran? Tindakan ini tidak bisa dibatalkan.', ()=>{
+    openConfirm('Hapus SEMUA data siswa, pembayaran, dan pengeluaran? Tindakan ini tidak bisa dibatalkan.', ()=>{
       store.state = defaultState();
       store.ui.activeTahunMulai = store.state.settings.tahunMulai;
       store.ui.bayarSiswaId = null;
@@ -228,6 +392,9 @@ export function renderPengaturan(){
            const d = defaultState();
            parsed.settings = Object.assign({}, d.settings, parsed.settings);
            if (!Array.isArray(parsed.absensi)) parsed.absensi = [];
+           if (!Array.isArray(parsed.pengeluaran)) parsed.pengeluaran = [];
+           if (!Array.isArray(parsed.posTagihan)) parsed.posTagihan = d.posTagihan;
+           if (!Array.isArray(parsed.settings.tahunAjaranTerkunci)) parsed.settings.tahunAjaranTerkunci = [];
            parsed.siswa.forEach(s => {
              if (!s.noHp && s.telepon) { s.noHp = s.telepon; delete s.telepon; }
            });

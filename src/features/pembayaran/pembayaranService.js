@@ -65,3 +65,29 @@ export function getSisaTagihanIjazah(siswaId, nominalIjazah) {
     .reduce((sum, p) => sum + p.nominal, 0);
   return { terbayar: ijazahTerbayar, sisa: Math.max(0, nominalIjazah - ijazahTerbayar) };
 }
+
+export function savePembayaranPosTagihan(siswaId, posTagihanId, namaTagihan, nominal, tanggal, ket, noKwitansi) {
+  const d = tanggal ? new Date(tanggal) : new Date();
+  const bulan = !isNaN(d.getTime()) ? d.getMonth() + 1 : new Date().getMonth() + 1;
+  const tahun = !isNaN(d.getTime()) ? d.getFullYear() : new Date().getFullYear();
+  store.state.pembayaran.push({
+    id: uid(),
+    siswaId,
+    jenis: posTagihanId,
+    namaTagihan,
+    bulan,
+    tahun,
+    tanggal,
+    nominal: parseInt(nominal, 10) || 0,
+    keterangan: ket,
+    noKwitansi
+  });
+  saveData('Pembayaran tersimpan');
+}
+
+export function getStatusPosTagihan(siswaId, posTagihanId, nominalKetetapan) {
+  const terbayar = store.state.pembayaran
+    .filter(p => p.siswaId === siswaId && p.jenis === posTagihanId)
+    .reduce((sum, p) => sum + p.nominal, 0);
+  return { terbayar, sisa: Math.max(0, nominalKetetapan - terbayar) };
+}

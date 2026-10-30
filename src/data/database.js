@@ -23,11 +23,19 @@ export function defaultState(){
       bulanMulai: 7,
       tahunMulai: now.getMonth()+1 >= 7 ? now.getFullYear() : now.getFullYear()-1,
       kwitansiCounter: 0,
+      bkkCounter: 0,
+      tahunAjaranTerkunci: [],
       adminPassword: 'admin',
       jamMasuk: '07:15',
       jamPulang: '14:00',
       beepAudio: true
     },
+    posTagihan: [
+      { id: 'tagihan-gedung', nama: 'Uang Gedung / Infaq Pembangunan', nominal: 1000000, tipe: 'sekali' },
+      { id: 'tagihan-seragam', nama: 'Seragam & Atribut Sekolah', nominal: 350000, tipe: 'sekali' },
+      { id: 'tagihan-kegiatan', nama: 'Kegiatan PHBI & Ujian Semester', nominal: 150000, tipe: 'semester' }
+    ],
+    pengeluaran: [],
     siswa: [
       {
         id: 's-demo-1',
@@ -80,6 +88,10 @@ export async function loadData(onLoaded){
         if(!store.state.siswa) store.state.siswa = [];
         if(!store.state.pembayaran) store.state.pembayaran = [];
         if(!store.state.absensi) store.state.absensi = [];
+        if(!store.state.pengeluaran) store.state.pengeluaran = [];
+        if(!store.state.posTagihan) store.state.posTagihan = d.posTagihan;
+        if(!store.state.settings.tahunAjaranTerkunci) store.state.settings.tahunAjaranTerkunci = [];
+        if(store.state.settings.bkkCounter === undefined) store.state.settings.bkkCounter = 0;
         // Migrate legacy 'telepon' field to 'noHp'
         store.state.siswa.forEach(s => {
           if (s.telepon && !s.noHp) {
@@ -141,5 +153,14 @@ export function resetData() {
 export function restoreData(parsed) {
   store.state = parsed;
   if (!store.state.absensi) store.state.absensi = [];
+  if (!store.state.pengeluaran) store.state.pengeluaran = [];
+  if (!store.state.posTagihan) {
+    store.state.posTagihan = [
+      { id: 'tagihan-gedung', nama: 'Uang Gedung / Infaq Pembangunan', nominal: 1000000, tipe: 'sekali' },
+      { id: 'tagihan-seragam', nama: 'Seragam & Atribut Sekolah', nominal: 350000, tipe: 'sekali' },
+      { id: 'tagihan-kegiatan', nama: 'Kegiatan PHBI & Ujian Semester', nominal: 150000, tipe: 'semester' }
+    ];
+  }
+  if (!store.state.settings.tahunAjaranTerkunci) store.state.settings.tahunAjaranTerkunci = [];
   store.isDataCorrupt = false;
 }

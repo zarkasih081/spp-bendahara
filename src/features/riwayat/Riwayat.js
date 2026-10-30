@@ -142,6 +142,42 @@ export function renderRiwayat(){
         </div>
       </div>
 
+      <!-- Status Pos Tagihan Sekolah Lainnya -->
+      ${(store.state.posTagihan || []).length > 0 ? `
+        <div class="card" style="margin-top:18px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+            <div>
+              <h3 style="margin:0; font-size:15px;">Kewajiban & Tagihan Sekolah Lainnya</h3>
+              <div class="card-sub" style="margin-top:2px;">Uang gedung, seragam, ujian, dan administrasi kesiswaan</div>
+            </div>
+          </div>
+          <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(220px, 1fr)); gap:12px; margin-top:14px;">
+            ${(store.state.posTagihan || []).map(pos => {
+              const terbayar = payments.filter(p => p.jenis === pos.id).reduce((sum, p) => sum + p.nominal, 0);
+              const sisa = Math.max(0, pos.nominal - terbayar);
+              const isLunas = terbayar >= pos.nominal;
+              return `
+                <div style="background:var(--paper-dim); border:1px solid var(--line); border-radius:10px; padding:12px 14px;">
+                  <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                    <div>
+                      <div style="font-size:13.5px; font-weight:700; color:var(--ink);">${escapeHtml(pos.nama)}</div>
+                      <div style="font-size:11px; color:var(--ink-soft); text-transform:uppercase; margin-top:1px;">Ketetapan: ${fmtRupiah(pos.nominal)}</div>
+                    </div>
+                    <span class="badge ${isLunas ? 'lunas' : 'parsial'}" style="font-size:10.5px;">
+                      ${isLunas ? 'Lunas' : 'Belum Lunas'}
+                    </span>
+                  </div>
+                  <div style="display:flex; justify-content:space-between; align-items:center; font-size:12px; margin-top:8px; padding-top:6px; border-top:1px dashed var(--line);">
+                    <span style="color:#059669; font-weight:600;">Terbayar: ${fmtRupiah(terbayar)}</span>
+                    <span style="color:${sisa > 0 ? '#DC2626' : '#10B981'}; font-weight:700;">${sisa > 0 ? `Sisa: ${fmtRupiah(sisa)}` : 'Selesai'}</span>
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+        </div>
+      ` : ''}
+
       <!-- Informasi Rekening Resmi Pembayaran Sekolah -->
       <div class="card" style="margin-top:18px; background:linear-gradient(135deg, rgba(67,56,202,0.04), rgba(59,130,246,0.06)); border:1.5px solid rgba(67,56,202,0.22); border-radius:12px;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">
@@ -428,6 +464,12 @@ export function renderRiwayat(){
           <option value="nunggak" ${store.ui.riwayatStatusFilter==='nunggak'?'selected':''}>Belum bayar</option>
         </select>
       </div>
+      <div class="toolbar-right">
+        <button class="btn btn-primary" id="btn-broadcast-wa-kelas" style="display:inline-flex; align-items:center; gap:6px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+          <span>Tagihan Kolektif Kelas (Broadcast WA)</span>
+        </button>
+      </div>
     </div>
     <div class="card" style="padding:0;">
       <div class="table-scroll">
@@ -486,6 +528,9 @@ export function renderRiwayat(){
   }
   document.getElementById('riwayat-kelas-filter').addEventListener('change', e=>{ store.ui.riwayatKelasFilter=e.target.value; store.ui.pageRiwayat=1; renderRiwayat(); });
   document.getElementById('riwayat-status-filter').addEventListener('change', e=>{ store.ui.riwayatStatusFilter=e.target.value; store.ui.pageRiwayat=1; renderRiwayat(); });
+  document.getElementById('btn-broadcast-wa-kelas')?.addEventListener('click', () => {
+    openModalBroadcastKelas(store.ui.riwayatKelasFilter || kelasList[0] || '');
+  });
   tbody.querySelectorAll('[data-detail]').forEach(b=>b.addEventListener('click', ()=>openDetailSiswa(b.dataset.detail)));
   tbody.querySelectorAll('[data-bayar-riw]').forEach(b=>b.addEventListener('click', ()=>{
     store.ui.bayarSiswaId = b.dataset.bayarRiw;
@@ -502,6 +547,196 @@ export function renderRiwayat(){
     const url = formatWaLink(s.noHp, teks);
     window.open(url, '_blank');
   }));
+}
+
+function openModalBroadcastKelas(activeKelas) {
+  const kelasList = [...new Set(store.state.siswa.map(s => s.kelas))].sort();
+  const selectedKelas = activeKelas || kelasList[0] || '';
+  const settings = store.state.settings || {};
+
+  const renderModalContent = (k) => {
+    const studentsInClass = store.state.siswa.filter(s => s.kelas === k);
+    const nunggakList = studentsInClass.map(s => ({
+      siswa: s,
+      tunggakan: siswaTunggakan(s.id)
+    })).filter(item => item.tunggakan.totalKurang > 0)
+      .sort((a,b) => b.tunggakan.totalKurang - a.tunggakan.totalKurang);
+
+    const totalTunggakanKelas = nunggakList.reduce((sum, item) => sum + item.tunggakan.totalKurang, 0);
+
+    const daftarTeksGrup = nunggakList.map((item, idx) => {
+      const s = item.siswa;
+      const t = item.tunggakan;
+      return `${idx + 1}. *${s.nama}* — ${t.jumlahBulan} Bulan (${fmtRupiah(t.totalKurang)})`;
+    }).join('\n');
+
+    const pesanGrupWa = `*PEMBERITAHUAN ADMINISTRASI SPP SISWA*\n` +
+      `*Madrasah: ${settings.namaSekolah.toUpperCase()}*\n` +
+      `Kelas: *${k}* • Tahun Ajaran: ${settings.tahunAjaran || ''}\n` +
+      `------------------------------------------------------\n` +
+      `Kepada Yth. Bapak/Ibu Orang Tua / Wali Murid Kelas ${k},\n\n` +
+      `Berikut kami sampaikan rekap pengingat administrasi SPP bulan berjalan bagi siswa yang belum menyelesaikan pembayaran:\n\n` +
+      (nunggakList.length > 0 ? daftarTeksGrup : `Alhamdulillah, seluruh siswa kelas ${k} telah LUNAS.\n`) +
+      `\n*Total Tunggakan Kelas: ${fmtRupiah(totalTunggakanKelas)}*\n\n` +
+      `*Rekening Resmi Pembayaran:*\n` +
+      `Bank      : ${settings.namaBank || 'Bank BRI / BSI'}\n` +
+      `No. Rek   : *${settings.noRekening || '0123-01-000000-50-0'}*\n` +
+      `Atas Nama : *${settings.atasNamaRekening || 'Bendahara Madrasah'}*\n\n` +
+      `Bukti transfer mohon dikirimkan ke Bendahara Madrasah. Apabila Bapak/Ibu telah melakukan pembayaran, mohon abaikan pesan ini.\n` +
+      `Terima kasih atas kerja sama dan perhatian Bapak/Ibu sekalian.`;
+
+    return `
+      <div class="modal-head">
+        <div>
+          <h3 style="margin:0;">Tagihan Kolektif Kelas (Broadcast WA)</h3>
+          <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">Pengingat tagihan SPP per kelas untuk grup WhatsApp atau pesan pribadi</div>
+        </div>
+        <button class="close-x" id="modal-close">&times;</button>
+      </div>
+      <div class="modal-body" style="padding:16px;">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
+          <div style="display:flex; align-items:center; gap:8px;">
+            <label style="margin:0; font-size:13px; font-weight:600;">Pilih Kelas:</label>
+            <select id="bc-select-kelas" style="font-size:13px; font-weight:700; padding:6px 12px;">
+              ${kelasList.map(c => `<option value="${escapeAttr(c)}" ${c === k ? 'selected' : ''}>Kelas ${escapeHtml(c)}</option>`).join('')}
+            </select>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <span class="badge ${nunggakList.length > 0 ? 'menunggak' : 'lunas'}">
+              ${nunggakList.length} Siswa Menunggak (${fmtRupiah(totalTunggakanKelas)})
+            </span>
+          </div>
+        </div>
+
+        <div class="tabs" style="margin-bottom:12px; padding:3px;">
+          <button type="button" class="tab-btn active" id="tab-bc-group" style="padding:5px 12px; font-size:12px;">Pesan Grup WhatsApp Wali Murid</button>
+          <button type="button" class="tab-btn" id="tab-bc-japri" style="padding:5px 12px; font-size:12px;">Antrean Kirim Japri (${nunggakList.length})</button>
+        </div>
+
+        <!-- Section 1: Pesan Grup WA -->
+        <div id="sec-bc-group">
+          <div style="font-size:12px; color:var(--ink-soft); margin-bottom:6px;">
+            Salin draf pengumuman resmi di bawah ini lalu tempel (paste) ke grup WhatsApp wali murid kelas ${escapeHtml(k)}.
+          </div>
+          <textarea id="bc-text-grup" readonly style="width:100%; height:190px; font-family:monospace; font-size:12px; background:var(--paper-dim); border:1px solid var(--line); border-radius:8px; padding:10px; line-height:1.45;">${escapeHtml(pesanGrupWa)}</textarea>
+          <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
+            <button class="btn btn-outline" id="btn-copy-grup-wa" style="display:inline-flex; align-items:center; gap:6px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
+              <span>Salin Pesan Pengumuman Grup</span>
+            </button>
+          </div>
+        </div>
+
+        <!-- Section 2: Japri One-Click -->
+        <div id="sec-bc-japri" style="display:none;">
+          ${nunggakList.length === 0 ? '<div class="empty-state" style="padding:20px;">Semua siswa di kelas ini telah lunas.</div>' : `
+            <div style="max-height:240px; overflow-y:auto; border:1px solid var(--line); border-radius:8px;">
+              <table style="width:100%; border-collapse:collapse; font-size:12.5px;">
+                <thead>
+                  <tr style="background:var(--paper-dim); border-bottom:1px solid var(--line);">
+                    <th style="padding:8px 10px; text-align:left;">Siswa</th>
+                    <th style="padding:8px 10px; text-align:left;">No. WhatsApp</th>
+                    <th style="padding:8px 10px; text-align:right;">Tunggakan</th>
+                    <th style="padding:8px 10px; text-align:right;">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${nunggakList.map(item => {
+                    const s = item.siswa;
+                    const t = item.tunggakan;
+                    const hasPhone = Boolean(s.noHp || s.telepon);
+                    const bulanStr = t.bulanBelum.map(b => `${BULAN[b.bulan-1]} ${b.tahun}`).join(', ');
+                    const pesanJapri = `Halo Bapak/Ibu Wali Murid dari *${s.nama}* (Kelas ${s.kelas}),\n\nKami menginformasikan bahwa terdapat tunggakan pembayaran SPP sebesar *${fmtRupiah(t.totalKurang)}* (${t.jumlahBulan} bulan: ${bulanStr}).\n\nPembayaran dapat ditransfer ke rekening resmi madrasah:\nBank: ${settings.namaBank || 'Bank BRI / BSI'}\nNo. Rek: *${settings.noRekening || '0123-01-000000-50-0'}*\nA.N: *${settings.atasNamaRekening || 'Bendahara Madrasah'}*\n\nMohon kirimkan bukti transfer ke nomor ini. Terima kasih.\n- Bendahara ${settings.namaSekolah}`;
+
+                    return `
+                      <tr style="border-bottom:1px solid var(--line);">
+                        <td style="padding:8px 10px;">
+                          <strong>${escapeHtml(s.nama)}</strong>
+                          <div style="font-size:11px; color:var(--ink-soft);">${escapeHtml(s.nis || '-')} • ${t.jumlahBulan} bln</div>
+                        </td>
+                        <td style="padding:8px 10px; font-family:monospace; color:${hasPhone ? 'var(--ink)' : 'var(--rust)'};">
+                          ${escapeHtml(s.noHp || s.telepon || '(Belum ada No. HP)')}
+                        </td>
+                        <td style="padding:8px 10px; text-align:right; font-family:monospace; color:#DC2626; font-weight:700;">
+                          ${fmtRupiah(t.totalKurang)}
+                        </td>
+                        <td style="padding:8px 10px; text-align:right; white-space:nowrap;">
+                          ${hasPhone ? `
+                            <button type="button" class="btn btn-sm btn-bc-japri" data-phone="${escapeAttr(s.noHp || s.telepon)}" data-msg="${escapeAttr(pesanJapri)}" style="background:#25D366; color:#fff; border-color:#25D366; padding:4px 10px; font-size:11.5px; display:inline-flex; align-items:center; gap:4px;">
+                              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+                              Kirim WA
+                            </button>
+                          ` : '<span style="font-size:11px; color:var(--ink-soft);">-</span>'}
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')}
+                </tbody>
+              </table>
+            </div>
+          `}
+        </div>
+      </div>
+      <div class="modal-foot">
+        <button class="btn" id="modal-cancel">Tutup</button>
+      </div>
+    `;
+  };
+
+  openModal(renderModalContent(selectedKelas), 'wide');
+
+  const setupEvents = (curK) => {
+    document.getElementById('bc-select-kelas')?.addEventListener('change', e => {
+      const nextK = e.target.value;
+      const modalBody = document.querySelector('.modal-content');
+      if (modalBody) {
+        modalBody.innerHTML = renderModalContent(nextK);
+        setupEvents(nextK);
+      }
+    });
+
+    const tabGroup = document.getElementById('tab-bc-group');
+    const tabJapri = document.getElementById('tab-bc-japri');
+    const secGroup = document.getElementById('sec-bc-group');
+    const secJapri = document.getElementById('sec-bc-japri');
+
+    tabGroup?.addEventListener('click', () => {
+      tabGroup.classList.add('active');
+      tabJapri?.classList.remove('active');
+      if (secGroup) secGroup.style.display = 'block';
+      if (secJapri) secJapri.style.display = 'none';
+    });
+
+    tabJapri?.addEventListener('click', () => {
+      tabJapri.classList.add('active');
+      tabGroup?.classList.remove('active');
+      if (secJapri) secJapri.style.display = 'block';
+      if (secGroup) secGroup.style.display = 'none';
+    });
+
+    document.getElementById('btn-copy-grup-wa')?.addEventListener('click', () => {
+      const text = document.getElementById('bc-text-grup')?.value;
+      if (text && navigator.clipboard) {
+        navigator.clipboard.writeText(text);
+        toast('Pesan pengumuman grup WA berhasil disalin!', 'success');
+      } else {
+        toast('Salin manual dari kotak teks di atas.', 'info');
+      }
+    });
+
+    document.querySelectorAll('.btn-bc-japri').forEach(btn => {
+      btn.addEventListener('click', () => {
+        const phone = btn.dataset.phone;
+        const msg = btn.dataset.msg;
+        window.open(formatWaLink(phone, msg), '_blank');
+        btn.textContent = 'Terkirim';
+        btn.style.background = '#64748B';
+        btn.style.borderColor = '#64748B';
+      });
+    });
+  };
+
+  setupEvents(selectedKelas);
 }
 
 function openDetailSiswa(id){
