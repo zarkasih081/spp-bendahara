@@ -55,10 +55,14 @@ export function renderRiwayat(){
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
               <span>Cetak Kartu SPP 1 Tahun</span>
             </button>
+            <button type="button" class="btn btn-sm btn-outline" id="btn-siswa-share-tagihan" style="display:inline-flex; align-items:center; gap:5px;" title="Bagikan Ringkasan Tagihan & Rekening Resmi ke WhatsApp">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:13px;height:13px;"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg>
+              <span>Kirim Tagihan ke WA Saya</span>
+            </button>
             ${t.totalKurang > 0 ? `
               <button type="button" class="btn btn-sm" id="btn-siswa-wa-tagihan" style="background:#25D366; color:#fff; border-color:#25D366;">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-                <span>Konfirmasi WA</span>
+                <span>Konfirmasi Bendahara</span>
               </button>
             ` : ''}
           </div>
@@ -76,7 +80,7 @@ export function renderRiwayat(){
             if (total >= nominal) {
               cardClass = 'paid';
               chipClass = 'paid';
-              chipText = '✓ Lunas';
+              chipText = 'Lunas';
             } else if (total > 0) {
               cardClass = 'due';
               chipClass = 'due';
@@ -84,7 +88,7 @@ export function renderRiwayat(){
             } else if (isPastOrCurrent) {
               cardClass = 'due';
               chipClass = 'due';
-              chipText = '! Menunggak';
+              chipText = 'Menunggak';
             }
 
             const matchingPayment = payments.find(pay => pay.bulan === p.bulan && pay.tahun === p.tahun && (!pay.jenis || pay.jenis === 'spp'));
@@ -175,8 +179,9 @@ export function renderRiwayat(){
         </div>
 
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; padding-top:10px; border-top:1px dashed rgba(67,56,202,0.2);">
-          <div style="font-size:12px; color:var(--ink-soft);">
-            💡 <em>Catatan:</em> Cantumkan Nama <strong>${escapeHtml(s.nama)}</strong> (${escapeHtml(s.kelas)}) di berita transfer dan kirim bukti transfer ke bendahara.
+          <div style="font-size:12px; color:var(--ink-soft); display:flex; align-items:center; gap:6px;">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" style="color:var(--primary); flex-shrink:0;"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+            <span><em>Catatan:</em> Cantumkan Nama <strong>${escapeHtml(s.nama)}</strong> (${escapeHtml(s.kelas)}) di berita transfer dan kirim bukti transfer ke bendahara.</span>
           </div>
           <button type="button" class="btn btn-sm btn-primary" id="btn-konfirmasi-transfer-wa" style="background:#25D366; border-color:#25D366; display:inline-flex; align-items:center; gap:6px;">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
@@ -255,6 +260,86 @@ export function renderRiwayat(){
       }
       const pesan = `Halo Bendahara ${store.state.settings.namaSekolah},\n\nSaya ingin mengirimkan *Bukti Transfer Pembayaran*:\nNama Siswa : *${s.nama}*\nKelas      : *${s.kelas}*\nNIS        : *${s.nis || '-'}*\n\nMohon dicek dan dicatat ke sistem. Berikut lampiran struk transfernya. Terima kasih.`;
       window.open(formatWaLink(noHp, pesan), '_blank');
+    });
+
+    document.getElementById('btn-siswa-share-tagihan')?.addEventListener('click', () => {
+      const sNama = s.nama;
+      const sKelas = s.kelas;
+      const sNis = s.nis || '-';
+      const settings = store.state.settings;
+      const rincianSPP = t.bulanBelum.length > 0 
+        ? t.bulanBelum.map(m => `  • ${BULAN[m.bulan-1]} ${m.tahun} : ${fmtRupiah(m.kurang)}`).join('\n')
+        : '  • Seluruh bulan berjalan LUNAS';
+      const sisaIjazah = Math.max(0, (settings.nominalIjazah || 500000) - ijazahTerbayar);
+      const targetPhone = s.noHp || s.telepon || '';
+
+      const pesanWa = `*RINCIAN TAGIHAN & KEUANGAN SISWA*\n` +
+        `Sekolah: *${settings.namaSekolah}*\n` +
+        `Tahun Ajaran: ${activeTaStart}/${activeTaStart+1}\n\n` +
+        `Nama Siswa : *${sNama}*\n` +
+        `Kelas      : *${sKelas}*\n` +
+        `NIS        : *${sNis}*\n\n` +
+        `*1. Tagihan SPP Bulanan:*\n` +
+        `${rincianSPP}\n` +
+        `Total Tagihan SPP: *${fmtRupiah(t.totalKurang)}*\n\n` +
+        `*2. Tabungan Administrasi Ijazah:*\n` +
+        `  • Ketetapan : ${fmtRupiah(settings.nominalIjazah || 500000)}\n` +
+        `  • Terbayar  : ${fmtRupiah(ijazahTerbayar)}\n` +
+        `  • Sisa      : *${fmtRupiah(sisaIjazah)}*\n\n` +
+        `*TOTAL KEWAJIBAN: ${fmtRupiah(t.totalKurang + sisaIjazah)}*\n\n` +
+        `*Rekening Resmi Pembayaran:*\n` +
+        `Bank       : ${settings.namaBank || 'Bank BRI / BSI'}\n` +
+        `No. Rek    : *${settings.noRekening || '0123-01-000000-50-0'}*\n` +
+        `Atas Nama  : *${settings.atasNamaRekening || 'Bendahara Madrasah'}*\n\n` +
+        `_Konfirmasi transfer dapat langsung menghubungi Bendahara Madrasah. Terima kasih._`;
+
+      openModal(`
+        <div class="modal-head">
+          <h3>Kirim Ringkasan Tagihan via WhatsApp</h3>
+          <button class="close-x" id="modal-close">&times;</button>
+        </div>
+        <div class="modal-body" style="padding:16px;">
+          <div style="font-size:13px; color:var(--ink-soft); margin-bottom:12px;">
+            Kirimkan rincian tagihan ini ke nomor WhatsApp Anda atau orang tua/wali untuk pengingat dan panduan transfer.
+          </div>
+          <div class="form-group">
+            <label>Nomor WhatsApp Tujuan</label>
+            <input id="wa-share-phone" type="tel" style="width:100%;" value="${escapeAttr(targetPhone)}" placeholder="cth. 081234567890">
+            <div class="helper-text">Nomor HP siswa atau orang tua/wali siswa.</div>
+          </div>
+          <div class="form-group" style="margin-top:12px;">
+            <label>Pratinjau Pesan</label>
+            <textarea id="wa-share-preview" readonly style="width:100%; height:130px; font-size:11.5px; font-family:monospace; background:var(--paper-dim); border:1px solid var(--line); border-radius:8px; padding:8px;">${escapeHtml(pesanWa)}</textarea>
+          </div>
+        </div>
+        <div class="modal-foot">
+          <button class="btn" id="modal-cancel">Batal</button>
+          <button class="btn btn-outline" id="btn-copy-wa-preview">Salin Pesan</button>
+          <button class="btn btn-primary" id="btn-send-wa-share" style="background:#25D366; border-color:#25D366; display:inline-flex; align-items:center; gap:6px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            Buka di WhatsApp
+          </button>
+        </div>
+      `);
+
+      document.getElementById('btn-copy-wa-preview')?.addEventListener('click', () => {
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(pesanWa);
+          toast('Pesan tagihan berhasil disalin ke clipboard!', 'success');
+        } else {
+          toast('Gagal menyalin otomatis, silakan salin manual dari kotak teks.', 'info');
+        }
+      });
+
+      document.getElementById('btn-send-wa-share')?.addEventListener('click', () => {
+        const phone = document.getElementById('wa-share-phone')?.value.trim();
+        if (!phone) {
+          toast('Masukkan nomor WhatsApp tujuan terlebih dahulu.', 'warning');
+          return;
+        }
+        window.open(formatWaLink(phone, pesanWa), '_blank');
+        closeModal();
+      });
     });
 
     document.getElementById('btn-siswa-wa-tagihan')?.addEventListener('click', () => {
@@ -442,7 +527,7 @@ function openDetailSiswa(id){
           const total = siswaTotalBulan(s.id, p.bulan, p.tahun);
           const nominal = store.state.settings.nominalSPP;
           const cls = total>=nominal ? 'paid' : '';
-          return `<div class="month-pill ${cls}">${BULAN[p.bulan-1]} '${String(p.tahun).slice(2)}<span class="chk">${total>=nominal?'✓ Lunas':total>0?fmtRupiah(total):'—'}</span></div>`;
+          return `<div class="month-pill ${cls}">${BULAN[p.bulan-1]} '${String(p.tahun).slice(2)}<span class="chk">${total>=nominal?'Lunas':total>0?fmtRupiah(total):'—'}</span></div>`;
         }).join('')}
       </div>
     </div>

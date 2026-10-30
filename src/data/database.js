@@ -9,6 +9,9 @@ export function defaultState(){
   return {
     settings: {
       namaSekolah: 'MTs Yasta Bunter',
+      alamatSekolah: 'Jl. Raya Bunter, Sukadana, Ciamis',
+      kepalaMadrasah: 'Drs. H. Mamat Rahmat, M.Pd.I',
+      nipKepalaMadrasah: '197205101998031002',
       tahunAjaran: `${now.getFullYear()}/${now.getFullYear()+1}`,
       bendahara: '',
       noHpBendahara: '',

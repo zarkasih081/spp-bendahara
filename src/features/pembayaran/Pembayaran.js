@@ -247,7 +247,7 @@ function renderMonthGrid(siswa, periode, nominal){
     const cls = isPaid ? 'paid' : (isSelected ? 'selected' : '');
     return `<div class="month-pill ${cls}" data-b="${p.bulan}" data-t="${p.tahun}">
       ${BULAN[p.bulan-1]} '${String(p.tahun).slice(2)}
-      <span class="chk">${isPaid?'✓ Lunas':(total>0?`Kurang ${fmtRupiah(kurang)}`:'')}</span>
+      <span class="chk">${isPaid ? 'Lunas' : (total > 0 ? `Kurang ${fmtRupiah(kurang)}` : '')}</span>
     </div>`;
   }).join('');
   grid.querySelectorAll('.month-pill:not(.paid)').forEach(pill=>{

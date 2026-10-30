@@ -22,7 +22,7 @@ import {
   registerRfidUid,
   removeRfidUid
 } from './absensiService.js';
-import { renderStudentCardHtml, generateQrDataUrl, downloadStudentQrCardPng } from './qrCardGenerator.js';
+import { renderStudentCardHtml, generateQrDataUrl, downloadStudentQrCardPng, downloadStudentCardBackPng } from './qrCardGenerator.js';
 import { Html5Qrcode } from 'html5-qrcode';
 
 let activeHtml5QrCode = null;
@@ -146,7 +146,7 @@ async function toggleTorch() {
       }
     }
   } catch (err) {}
-  toast(isTorchActive ? 'Senter kamera aktif ⚡' : 'Senter kamera nonaktif', 'info');
+  toast(isTorchActive ? 'Senter kamera aktif' : 'Senter kamera nonaktif', 'info');
 }
 
 function toggleScannerPause() {
@@ -211,6 +211,16 @@ const onFsChange = () => {
     if (wrapper && wrapper.classList.contains('camera-fullscreen-active')) {
       wrapper.classList.remove('camera-fullscreen-active');
       document.body.classList.remove('camera-fs-body-lock');
+    }
+    if (document.body.classList.contains('kiosk-mode-active')) {
+      document.body.classList.remove('kiosk-mode-active');
+      const btnKiosk = document.getElementById('btn-toggle-kiosk');
+      if (btnKiosk) {
+        btnKiosk.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
+          <span class="txt-kiosk">Mode Kiosk Terpadu</span>
+        `;
+      }
     }
   }
 };
@@ -314,10 +324,10 @@ async function renderSiswaAbsensiView(el, user) {
     statusBadgeToday = `<span class="badge" style="background:var(--paper-dim); color:var(--ink-soft); font-size:13px; padding:6px 14px; border:1px solid var(--line);">Belum Hadir</span>`;
     statusDescToday = 'Ananda belum melakukan tap kartu RFID atau scan presensi hari ini.';
   } else if (todayRecord.status === 'hadir') {
-    statusBadgeToday = `<span class="badge lunas" style="font-size:13px; padding:6px 14px;">✓ Hadir Tepat Waktu</span>`;
+    statusBadgeToday = `<span class="badge lunas" style="font-size:13px; padding:6px 14px;">Hadir Tepat Waktu</span>`;
     statusDescToday = `Masuk pukul <strong>${formatTimeDisplay(todayRecord.jamMasuk)}</strong>${todayRecord.jamPulang ? ` • Pulang: <strong>${formatTimeDisplay(todayRecord.jamPulang)}</strong>` : ' • Belum tap pulang'}`;
   } else if (todayRecord.status === 'terlambat') {
-    statusBadgeToday = `<span class="badge parsial" style="font-size:13px; padding:6px 14px;">! Terlambat</span>`;
+    statusBadgeToday = `<span class="badge parsial" style="font-size:13px; padding:6px 14px;">Terlambat</span>`;
     statusDescToday = `Masuk pukul <strong>${formatTimeDisplay(todayRecord.jamMasuk)}</strong> (${todayRecord.keterangan || 'Melewati batas jam masuk'})${todayRecord.jamPulang ? ` • Pulang: <strong>${formatTimeDisplay(todayRecord.jamPulang)}</strong>` : ''}`;
   } else if (todayRecord.status === 'izin') {
     statusBadgeToday = `<span class="badge" style="background:var(--blue-soft); color:var(--blue); font-size:13px; padding:6px 14px;">Izin</span>`;
@@ -350,19 +360,19 @@ async function renderSiswaAbsensiView(el, user) {
           <!-- 4 Pill Waktu Harian (Masuk, Pulang, Duha, Dzuhur) -->
           <div class="siswa-today-times-grid" style="display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; margin-top:14px;">
             <div class="time-pill-box ${todayRecord?.jamMasuk ? 'active' : ''}">
-              <div class="tpb-label">📥 Jam Masuk</div>
+              <div class="tpb-label">Jam Masuk</div>
               <div class="tpb-time monospace">${formatTimeDisplay(todayRecord?.jamMasuk)}</div>
             </div>
             <div class="time-pill-box ${todayRecord?.jamPulang ? 'active' : ''}">
-              <div class="tpb-label">📤 Jam Pulang</div>
+              <div class="tpb-label">Jam Pulang</div>
               <div class="tpb-time monospace">${formatTimeDisplay(todayRecord?.jamPulang)}</div>
             </div>
             <div class="time-pill-box duha ${todayRecord?.jamDuha ? 'active' : ''}">
-              <div class="tpb-label">☀️ Solat Duha</div>
+              <div class="tpb-label">Sholat Dhuha</div>
               <div class="tpb-time monospace">${formatTimeDisplay(todayRecord?.jamDuha)}</div>
             </div>
             <div class="time-pill-box dzuhur ${todayRecord?.jamDzuhur ? 'active' : ''}">
-              <div class="tpb-label">🕌 Solat Dzuhur</div>
+              <div class="tpb-label">Sholat Dzuhur</div>
               <div class="tpb-time monospace">${formatTimeDisplay(todayRecord?.jamDzuhur)}</div>
             </div>
           </div>
@@ -370,8 +380,9 @@ async function renderSiswaAbsensiView(el, user) {
 
         <div style="margin-top:16px; padding-top:12px; border-top:1px solid var(--line); display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
           <div style="font-size:12px; color:var(--ink-soft); display:flex; align-items:center; gap:6px;">
-            <span class="badge ${siswa.rfidUid ? 'lunas' : ''}" style="font-size:11px; padding:3px 8px;">
-              ${siswa.rfidUid ? `💳 Kartu RFID: ${siswa.rfidUid}` : '💳 Belum Ada Kartu RFID'}
+            <span class="badge ${siswa.rfidUid ? 'lunas' : ''}" style="font-size:11px; padding:3px 8px; display:inline-flex; align-items:center; gap:5px;">
+              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 9h6M14 12h4M14 15h6"/></svg>
+              <span>${siswa.rfidUid ? `RFID: ${siswa.rfidUid}` : 'Kartu RFID Belum Terdaftar'}</span>
             </span>
           </div>
           <button type="button" class="btn btn-sm btn-outline" id="btn-siswa-ajukan-izin" title="Kirim Permohonan Izin / Sakit via WhatsApp ke Sekolah">
@@ -498,8 +509,8 @@ async function renderSiswaAbsensiView(el, user) {
                 <th>Tanggal</th>
                 <th>Masuk</th>
                 <th>Pulang</th>
-                <th>☀️ Duha</th>
-                <th>🕌 Dzuhur</th>
+                <th>Sholat Dhuha</th>
+                <th>Sholat Dzuhur</th>
                 <th>Status</th>
               </tr>
             </thead>
@@ -672,8 +683,8 @@ async function renderSiswaAbsensiView(el, user) {
       }
 
       let statusBadge = '';
-      if (rec.status === 'hadir') statusBadge = '<span class="badge lunas" style="font-size:13px; padding:6px 14px;">✓ Hadir Tepat Waktu</span>';
-      else if (rec.status === 'terlambat') statusBadge = '<span class="badge parsial" style="font-size:13px; padding:6px 14px;">! Terlambat</span>';
+      if (rec.status === 'hadir') statusBadge = '<span class="badge lunas" style="font-size:13px; padding:6px 14px;">Hadir Tepat Waktu</span>';
+      else if (rec.status === 'terlambat') statusBadge = '<span class="badge parsial" style="font-size:13px; padding:6px 14px;">Terlambat</span>';
       else if (rec.status === 'izin') statusBadge = '<span class="badge" style="background:var(--blue-soft); color:var(--blue); font-size:13px; padding:6px 14px;">Izin</span>';
       else if (rec.status === 'sakit') statusBadge = '<span class="badge" style="background:var(--gold-soft); color:var(--gold); font-size:13px; padding:6px 14px;">Sakit</span>';
       else statusBadge = '<span class="badge nunggak" style="font-size:13px; padding:6px 14px;">Alpa</span>';
@@ -697,19 +708,19 @@ async function renderSiswaAbsensiView(el, user) {
 
           <div style="display:grid; grid-template-columns:repeat(2, 1fr); gap:10px; margin-bottom:14px;">
             <div class="time-pill-box ${rec.jamMasuk ? 'active' : ''}">
-              <div class="tpb-label">📥 Jam Masuk</div>
+              <div class="tpb-label">Jam Masuk</div>
               <div class="tpb-time monospace">${formatTimeDisplay(rec.jamMasuk)}</div>
             </div>
             <div class="time-pill-box ${rec.jamPulang ? 'active' : ''}">
-              <div class="tpb-label">📤 Jam Pulang</div>
+              <div class="tpb-label">Jam Pulang</div>
               <div class="tpb-time monospace">${formatTimeDisplay(rec.jamPulang)}</div>
             </div>
             <div class="time-pill-box duha ${rec.jamDuha ? 'active' : ''}">
-              <div class="tpb-label">☀️ Solat Duha</div>
+              <div class="tpb-label">Sholat Dhuha</div>
               <div class="tpb-time monospace">${formatTimeDisplay(rec.jamDuha)}</div>
             </div>
             <div class="time-pill-box dzuhur ${rec.jamDzuhur ? 'active' : ''}">
-              <div class="tpb-label">🕌 Solat Dzuhur</div>
+              <div class="tpb-label">Sholat Dzuhur</div>
               <div class="tpb-time monospace">${formatTimeDisplay(rec.jamDzuhur)}</div>
             </div>
           </div>
@@ -863,16 +874,33 @@ async function renderBendaharaAbsensiView(el) {
   }
 }
 
-function toggleKioskMode() {
+async function toggleKioskMode() {
   const isKiosk = document.body.classList.toggle('kiosk-mode-active');
   const btnKiosk = document.getElementById('btn-toggle-kiosk');
+  
+  if (isKiosk) {
+    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
+      try {
+        await document.documentElement.requestFullscreen();
+      } catch (err) {
+        console.warn('Fullscreen request blocked or not supported:', err);
+      }
+    }
+  } else {
+    if (document.fullscreenElement && document.exitFullscreen) {
+      try {
+        await document.exitFullscreen();
+      } catch (err) {}
+    }
+  }
+
   if (btnKiosk) {
     btnKiosk.innerHTML = isKiosk ? `
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M8 3v3a2 2 0 0 1-2 2H3m18 0h-3a2 2 0 0 1-2-2V3m0 18v-3a2 2 0 0 1 2-2h3M3 16h3a2 2 0 0 1 2 2v3"/></svg>
       <span>Keluar Kiosk</span>
     ` : `
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><path d="M8 3H5a2 2 0 0 0-2 2v3m18 0V5a2 2 0 0 0-2-2h-3m0 18h3a2 2 0 0 0 2-2v-3M3 16v3a2 2 0 0 0 2 2h3"/></svg>
-      <span>Mode Kiosk Terpadu</span>
+      <span class="txt-kiosk">Mode Kiosk Terpadu</span>
     `;
   }
   toast(isKiosk ? 'Mode Kiosk Layar Penuh Aktif' : 'Keluar dari Mode Kiosk', 'info');
@@ -913,19 +941,19 @@ async function renderScanTab(container) {
       <div class="kiosk-counters">
         <div class="k-stat gold" title="Siswa Masuk Tepat Waktu">
           <span class="k-val" id="kiosk-stat-hadir">${stats.hadir}</span>
-          <span class="k-lbl">✓ Tepat Waktu</span>
+          <span class="k-lbl">Tepat Waktu</span>
         </div>
         <div class="k-stat warning" title="Siswa Masuk Terlambat">
           <span class="k-val" id="kiosk-stat-terlambat">${stats.terlambat}</span>
-          <span class="k-lbl">! Terlambat</span>
+          <span class="k-lbl">Terlambat</span>
         </div>
         <div class="k-stat blue" title="Siswa Solat Duha">
           <span class="k-val" id="kiosk-stat-duha">${stats.duha || 0}</span>
-          <span class="k-lbl">☀️ Duha</span>
+          <span class="k-lbl">Dhuha</span>
         </div>
         <div class="k-stat emerald" title="Siswa Solat Dzuhur">
           <span class="k-val" id="kiosk-stat-dzuhur">${stats.dzuhur || 0}</span>
-          <span class="k-lbl">🕌 Dzuhur</span>
+          <span class="k-lbl">Dzuhur</span>
         </div>
         <div class="k-stat gray" title="Siswa Belum Melakukan Absensi">
           <span class="k-val" id="kiosk-stat-belum">${stats.belumHadir}</span>
@@ -938,19 +966,19 @@ async function renderScanTab(container) {
     <div class="kiosk-mode-bar" style="margin-bottom:16px;">
       <div class="mode-grid-kiosk">
         <button class="btn-mode-kiosk ${currentKioskAttendanceMode === 'auto' ? 'aktif' : ''}" data-kiosk-mode="auto" title="Deteksi Otomatis (Masuk / Pulang)">
-          🤖 Otomatis (Pintar)
+          Mode Otomatis
         </button>
         <button class="btn-mode-kiosk ${currentKioskAttendanceMode === 'masuk' ? 'aktif' : ''}" data-kiosk-mode="masuk" title="Absen Masuk Sekolah">
-          📥 Absen Masuk
+          Presensi Masuk
         </button>
         <button class="btn-mode-kiosk ${currentKioskAttendanceMode === 'pulang' ? 'aktif' : ''}" data-kiosk-mode="pulang" title="Absen Pulang Sekolah">
-          📤 Absen Pulang
+          Presensi Pulang
         </button>
         <button class="btn-mode-kiosk ${currentKioskAttendanceMode === 'duha' ? 'aktif' : ''}" data-kiosk-mode="duha" title="Presensi Solat Duha Berjamaah">
-          ☀️ Solat Duha
+          Sholat Dhuha
         </button>
         <button class="btn-mode-kiosk ${currentKioskAttendanceMode === 'dzuhur' ? 'aktif' : ''}" data-kiosk-mode="dzuhur" title="Presensi Solat Dzuhur Berjamaah">
-          🕌 Solat Dzuhur
+          Sholat Dzuhur
         </button>
       </div>
       <div id="kiosk-mode-info" style="font-size:12.5px; color:var(--ink-soft); margin-top:8px; text-align:center;">
@@ -965,7 +993,9 @@ async function renderScanTab(container) {
         <div class="rfid-tap-hero-box" style="margin-bottom:16px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
             <div style="font-size:13px; font-weight:700; color:var(--ink); display:flex; align-items:center; gap:6px;">
-              <span class="pulse-rfid-icon">💳</span>
+              <span class="pulse-rfid-icon">
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 9h6M14 12h4M14 15h6"/></svg>
+              </span>
               <span>Reader Kartu RFID 125KHz USB:</span>
             </div>
             <span class="scanner-live-badge"><span class="dot-radar"></span>Siap Tap Kartu</span>
@@ -1162,11 +1192,11 @@ async function renderScanTab(container) {
 }
 
 function getModeLabel(mode) {
-  if (mode === 'masuk') return '📥 Absen Masuk';
-  if (mode === 'pulang') return '📤 Absen Pulang';
-  if (mode === 'duha') return '☀️ Solat Duha';
-  if (mode === 'dzuhur') return '🕌 Solat Dzuhur';
-  return '🤖 Otomatis (Masuk / Pulang Pintar)';
+  if (mode === 'masuk') return 'Presensi Masuk';
+  if (mode === 'pulang') return 'Presensi Pulang';
+  if (mode === 'duha') return 'Sholat Dhuha';
+  if (mode === 'dzuhur') return 'Sholat Dzuhur';
+  return 'Otomatis (Masuk / Pulang Pintar)';
 }
 
 function setKioskAttendanceMode(newMode) {
@@ -1416,8 +1446,8 @@ function processRfidOrQrScan(rawCode) {
       container.innerHTML = `
         <div class="card scan-alert scan-error" style="background:#fef2f2; border:1px solid #f87171; padding:16px; display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:12px; animation:shake 0.4s ease;">
           <div style="display:flex; align-items:center; gap:12px;">
-            <div style="width:42px;height:42px;border-radius:50%;background:#fee2e2;color:#dc2626;display:flex;align-items:center;justify-content:center;flex-shrink:0; font-size:20px;">
-              ❌
+            <div style="width:40px;height:40px;border-radius:50%;background:#fee2e2;color:#dc2626;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+              <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
             </div>
             <div>
               <div style="font-weight:700; color:#991b1b; font-size:14px;">Kartu Tidak Dikenal!</div>
@@ -1425,8 +1455,9 @@ function processRfidOrQrScan(rawCode) {
             </div>
           </div>
           ${result.unknownUid ? `
-            <button class="btn btn-sm btn-primary" id="btn-quick-register-rfid" data-unknown-uid="${escapeAttr(result.unknownUid)}">
-              💳 Daftarkan Kartu Ini
+            <button class="btn btn-sm btn-primary" id="btn-quick-register-rfid" data-unknown-uid="${escapeAttr(result.unknownUid)}" style="display:inline-flex; align-items:center; gap:6px;">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 9h6M14 12h4M14 15h6"/></svg>
+              <span>Daftarkan Kartu Ini</span>
             </button>
           ` : ''}
         </div>
@@ -1446,33 +1477,33 @@ function processRfidOrQrScan(rawCode) {
   let badgeColor = '#10b981';
   let badgeBg = '#ecfdf5';
   let badgeText = 'Tepat Waktu';
-  let iconDisplay = '✅';
+  let iconDisplay = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>`;
 
   if (type === 'pulang') {
     badgeColor = '#3b82f6';
     badgeBg = '#eff6ff';
-    badgeText = 'Absen Pulang';
-    iconDisplay = '📤';
+    badgeText = 'Presensi Pulang';
+    iconDisplay = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>`;
   } else if (type === 'duha') {
     badgeColor = '#d97706';
     badgeBg = '#fffdf0';
-    badgeText = 'Solat Duha';
-    iconDisplay = '☀️';
+    badgeText = 'Sholat Dhuha';
+    iconDisplay = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>`;
   } else if (type === 'dzuhur') {
     badgeColor = '#047857';
     badgeBg = '#ecfdf5';
-    badgeText = 'Solat Dzuhur';
-    iconDisplay = '🕌';
+    badgeText = 'Sholat Dzuhur';
+    iconDisplay = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 14 14"/></svg>`;
   } else if (status === 'terlambat') {
     badgeColor = '#d97706';
     badgeBg = '#fef3c7';
     badgeText = 'Terlambat';
-    iconDisplay = '⏰';
+    iconDisplay = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>`;
   } else if (type === 'duplicate' || type === 'completed') {
     badgeColor = '#6b7280';
     badgeBg = '#f3f4f6';
     badgeText = 'Sudah Tercatat';
-    iconDisplay = '⚠️';
+    iconDisplay = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`;
   }
 
   const waLink = formatWaLinkAbsensi(siswa, record);
@@ -1481,8 +1512,12 @@ function processRfidOrQrScan(rawCode) {
     container.innerHTML = `
       <div class="card scan-alert scan-success verified-card" style="border:2px solid ${badgeColor}; padding:14px 18px;">
         <div style="display:flex; align-items:center; gap:14px;">
-          <div class="verified-avatar" style="background:${badgeBg}; color:${badgeColor}; border:2px solid ${badgeColor}; font-size:22px; width:48px; height:48px;">
-            ${iconDisplay}
+          <div style="position:relative; width:48px; height:48px; flex-shrink:0;">
+            ${siswa.foto 
+              ? `<img src="${escapeAttr(siswa.foto)}" alt="${escapeAttr(siswa.nama)}" style="width:48px; height:48px; border-radius:50%; object-fit:cover; border:2px solid ${badgeColor}; box-shadow:0 2px 8px rgba(0,0,0,0.12);">` 
+              : `<div class="verified-avatar" style="background:${badgeBg}; color:${badgeColor}; border:2px solid ${badgeColor}; font-size:20px; width:48px; height:48px; display:flex; align-items:center; justify-content:center; border-radius:50%;">${iconDisplay}</div>`
+            }
+            ${siswa.foto ? `<span style="position:absolute; bottom:-2px; right:-2px; width:18px; height:18px; border-radius:50%; background:${badgeColor}; color:#fff; display:flex; align-items:center; justify-content:center; padding:2px; box-shadow:0 1px 3px rgba(0,0,0,0.3);">${iconDisplay}</span>` : ''}
           </div>
           <div>
             <div style="display:flex; align-items:center; gap:8px;">
@@ -1531,10 +1566,10 @@ function renderLiveFeedRows(todayScans) {
     let waktuStr = '-';
 
     if (s.aktivitasTerakhir === 'Solat Duha' || (!s.aktivitasTerakhir && s.jamDuha)) {
-      aktivitasHtml = '<span class="badge" style="background:#fffdf0; color:#b08d00; border:1px solid #fde68a;">☀️ Solat Duha</span>';
+      aktivitasHtml = '<span class="badge" style="background:#fffdf0; color:#b08d00; border:1px solid #fde68a;">Solat Duha</span>';
       waktuStr = formatTimeDisplay(s.jamDuha);
     } else if (s.aktivitasTerakhir === 'Solat Dzuhur' || (!s.aktivitasTerakhir && s.jamDzuhur)) {
-      aktivitasHtml = '<span class="badge" style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;">🕌 Solat Dzuhur</span>';
+      aktivitasHtml = '<span class="badge" style="background:#ecfdf5; color:#047857; border:1px solid #a7f3d0;">Solat Dzuhur</span>';
       waktuStr = formatTimeDisplay(s.jamDzuhur);
     } else if (s.jamPulang) {
       aktivitasHtml = '<span class="badge" style="background:#eff6ff; color:#2563eb;">Pulang</span>';
@@ -1676,7 +1711,7 @@ function renderRfidRegistrationTab(container, kelasList) {
       <div class="toolbar-right">
         <button class="btn btn-primary" id="btn-auto-next-rfid" title="Daftarkan kartu RFID siswa secara beruntun otomatis">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-          ⚡ Mode Daftar Beruntun (Auto-Next)
+          <span>Mode Daftar Beruntun (Auto-Next)</span>
         </button>
       </div>
     </div>
@@ -1701,7 +1736,10 @@ function renderRfidRegistrationTab(container, kelasList) {
             ` : filtered.map((s, idx) => {
               const hasUid = !!(s.rfidUid && s.rfidUid.trim());
               const uidBadge = hasUid
-                ? `<span class="badge lunas monospace" style="font-size:12.5px; font-weight:700;">💳 ${escapeHtml(s.rfidUid)}</span>`
+                ? `<span class="badge lunas monospace" style="font-size:12px; font-weight:700; display:inline-flex; align-items:center; gap:5px;">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 9h6M14 12h4M14 15h6"/></svg>
+                    <span>${escapeHtml(s.rfidUid)}</span>
+                   </span>`
                 : `<span class="badge" style="background:var(--paper-dim); color:var(--ink-soft);">Belum ada</span>`;
 
               return `
@@ -1792,7 +1830,9 @@ function openRfidScanModal(siswaId, namaSiswa, autoNext = false, onComplete = nu
       <button class="close-x" id="modal-close">&times;</button>
     </div>
     <div class="modal-body" style="text-align:center; padding:24px 20px;">
-      <div style="font-size:48px; margin-bottom:8px; animation:popIn 0.3s ease;">💳</div>
+      <div style="width:54px; height:54px; border-radius:50%; background:var(--primary-soft); color:var(--primary); display:flex; align-items:center; justify-content:center; margin:0 auto 12px;">
+        <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 9h6M14 12h4M14 15h6"/></svg>
+      </div>
       <h2 style="margin:0 0 4px 0; font-size:18px; color:var(--ink);">${escapeHtml(namaSiswa)}</h2>
       <div style="font-size:12.5px; color:var(--ink-soft); font-family:'IBM Plex Mono',monospace; margin-bottom:18px;">
         KELAS: ${escapeHtml(siswa.kelas)} • NIS: ${escapeHtml(siswa.nis || '-')}
@@ -1803,7 +1843,7 @@ function openRfidScanModal(siswaId, namaSiswa, autoNext = false, onComplete = nu
         <input type="text" id="rfid-scan-modal-input" placeholder="Menunggu kartu..." style="width:100%; text-align:center; font-family:'IBM Plex Mono',monospace; font-size:18px; font-weight:700; padding:12px; border:2px solid var(--green); border-radius:10px; background:var(--paper); color:var(--ink);" autocomplete="off">
         <div id="rfid-modal-status" style="margin-top:10px; font-size:13px; font-weight:600; min-height:22px;"></div>
       </div>
-      ${autoNext ? `<div style="font-size:11.5px; color:var(--primary); font-weight:600;">⚡ Mode Beruntun Aktif: Otomatis lanjut ke siswa berikutnya setelah berhasil.</div>` : ''}
+      ${autoNext ? `<div style="font-size:11.5px; color:var(--primary); font-weight:600;">Mode Beruntun Aktif: Otomatis lanjut ke siswa berikutnya setelah berhasil.</div>` : ''}
     </div>
     <div class="modal-foot" style="justify-content:center;">
       <button class="btn btn-secondary" id="modal-cancel">Batal</button>
@@ -1828,7 +1868,7 @@ function openRfidScanModal(siswaId, namaSiswa, autoNext = false, onComplete = nu
 
       const res = registerRfidUid(siswaId, uid);
       if (res.success) {
-        statusEl.textContent = '✅ ' + res.message;
+        statusEl.textContent = res.message;
         statusEl.style.color = '#10b981';
         toast(res.message, 'success');
 
@@ -1839,7 +1879,7 @@ function openRfidScanModal(siswaId, namaSiswa, autoNext = false, onComplete = nu
               closeModal();
               openRfidScanModal(nextStudent.id, nextStudent.nama, true, onComplete);
             } else {
-              toast('Selamat! Semua siswa telah selesai didaftarkan kartu RFID.', 'success');
+              toast('Semua siswa telah selesai didaftarkan kartu RFID.', 'success');
               closeModal();
               if (onComplete) onComplete();
             }
@@ -1849,7 +1889,7 @@ function openRfidScanModal(siswaId, namaSiswa, autoNext = false, onComplete = nu
           }
         }, 900);
       } else {
-        statusEl.textContent = '❌ ' + res.message;
+        statusEl.textContent = res.message;
         statusEl.style.color = '#ef4444';
         toast(res.message, 'error');
         setTimeout(() => inputEl.focus(), 200);
@@ -1928,8 +1968,8 @@ function renderRekapTab(container, selectedDate, kelasList) {
     <!-- Segmented Tab: Rekap Harian vs Bulanan -->
     <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; margin-bottom:14px;">
       <div class="tabs" style="margin:0;">
-        <button class="tab-btn ${rekapMode === 'harian' ? 'active' : ''}" id="btn-mode-harian">📅 Rekap Harian</button>
-        <button class="tab-btn ${rekapMode === 'bulanan' ? 'active' : ''}" id="btn-mode-bulanan">📊 Rekap Bulanan per Siswa</button>
+        <button class="tab-btn ${rekapMode === 'harian' ? 'active' : ''}" id="btn-mode-harian">Rekap Harian</button>
+        <button class="tab-btn ${rekapMode === 'bulanan' ? 'active' : ''}" id="btn-mode-bulanan">Rekap Bulanan per Siswa</button>
       </div>
 
       <div style="display:flex; gap:8px;">
@@ -1970,7 +2010,7 @@ function renderRekapTab(container, selectedDate, kelasList) {
         </div>
         <div class="toolbar-right">
           <button class="btn btn-sm btn-outline" id="btn-bulk-hadir" title="Tandai semua siswa belum hadir jadi hadir">
-            ✓ Tandai Semua Hadir
+            Tandai Semua Hadir
           </button>
         </div>
       </div>
@@ -2015,8 +2055,8 @@ function renderRekapTab(container, selectedDate, kelasList) {
                 <th>Status</th>
                 <th>Masuk</th>
                 <th>Pulang</th>
-                <th>☀️ Duha</th>
-                <th>🕌 Dzuhur</th>
+                <th>Sholat Dhuha</th>
+                <th>Sholat Dzuhur</th>
                 <th>Keterangan</th>
                 <th style="width:110px; text-align:center;">Aksi</th>
               </tr>
@@ -2063,7 +2103,7 @@ function renderRekapTab(container, selectedDate, kelasList) {
                     <td style="text-align:center; white-space:nowrap;">
                       ${!rec ? `
                         <button class="btn btn-sm btn-outline" data-quick-hadir="${s.id}" title="Tandai Hadir Tepat Waktu" style="padding:2px 8px; font-size:11.5px;">
-                          ✓ Hadir
+                          Hadir
                         </button>
                       ` : ''}
                       ${waUrl ? `
@@ -2119,8 +2159,8 @@ function renderRekapTab(container, selectedDate, kelasList) {
                 <th style="text-align:center;">Hadir</th>
                 <th style="text-align:center;">Telat</th>
                 <th style="text-align:center;">Total Masuk</th>
-                <th style="text-align:center;">☀️ Duha</th>
-                <th style="text-align:center;">🕌 Dzuhur</th>
+                <th style="text-align:center;">Sholat Dhuha</th>
+                <th style="text-align:center;">Sholat Dzuhur</th>
                 <th style="text-align:center;">Izin</th>
                 <th style="text-align:center;">Sakit</th>
                 <th style="text-align:center;">Alpa</th>
@@ -2293,10 +2333,14 @@ async function renderKartuTab(container, kelasList) {
           ${kelasList.map(k => `<option value="${escapeAttr(k)}" ${kelasFilter === k ? 'selected' : ''}>${escapeHtml(k)}</option>`).join('')}
         </select>
       </div>
-      <div class="toolbar-right">
-        <button class="btn btn-primary" id="btn-print-all-cards">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:16px;height:16px;"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
-          Cetak Kartu Terfilter (${filteredStudents.length})
+      <div class="toolbar-right" style="display:flex; gap:8px; flex-wrap:wrap;">
+        <button class="btn btn-outline" id="btn-print-front-cards" style="display:inline-flex; align-items:center; gap:6px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><line x1="9" y1="3" x2="9" y2="21"/></svg>
+          <span>Cetak Depan Saja (${filteredStudents.length})</span>
+        </button>
+        <button class="btn btn-primary" id="btn-print-duo-cards" style="display:inline-flex; align-items:center; gap:6px;">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:15px;height:15px;"><polyline points="6 9 6 2 18 2 18 9"></polyline><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"></path><rect x="6" y="14" width="12" height="8"></rect></svg>
+          <span>Cetak 2 Sisi Lipat (${filteredStudents.length})</span>
         </button>
       </div>
     </div>
@@ -2323,8 +2367,12 @@ async function renderKartuTab(container, kelasList) {
     renderKartuTab(container, kelasList);
   });
 
-  document.getElementById('btn-print-all-cards')?.addEventListener('click', () => {
-    printCardsList(filteredStudents);
+  document.getElementById('btn-print-front-cards')?.addEventListener('click', () => {
+    printCardsList(filteredStudents, 'front');
+  });
+
+  document.getElementById('btn-print-duo-cards')?.addEventListener('click', () => {
+    printCardsList(filteredStudents, 'duo');
   });
 
   const gridEl = document.getElementById('cards-preview-grid');
@@ -2338,12 +2386,19 @@ async function renderKartuTab(container, kelasList) {
     return `
       <div class="id-card-wrapper" style="display:flex; flex-direction:column; align-items:center; gap:8px;">
         ${cardContent}
-        <div style="display:flex; gap:6px;">
-          <button class="btn btn-sm btn-outline" data-print-single="${s.id}">
+        <div style="display:flex; gap:5px; flex-wrap:wrap; justify-content:center; margin-top:4px;">
+          <button class="btn btn-sm btn-ghost" data-flip-card="${s.id}" title="Balik Kartu (Depan / Belakang)" style="padding:4px 8px; font-size:11.5px;">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:12px;height:12px;"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+            Balik
+          </button>
+          <button class="btn btn-sm btn-outline" data-print-single="${s.id}" style="padding:4px 8px; font-size:11.5px;">
             Cetak
           </button>
-          <button class="btn btn-sm btn-primary" data-dl-qr="${s.id}">
-            Unduh PNG
+          <button class="btn btn-sm btn-primary" data-dl-qr="${s.id}" title="Unduh Sisi Depan (QR)" style="padding:4px 8px; font-size:11.5px;">
+            PNG Depan
+          </button>
+          <button class="btn btn-sm btn-secondary" data-dl-back="${s.id}" title="Unduh Sisi Belakang (Tata Tertib)" style="padding:4px 8px; font-size:11.5px;">
+            PNG Belakang
           </button>
         </div>
       </div>
@@ -2352,6 +2407,13 @@ async function renderKartuTab(container, kelasList) {
 
   const allCardsHtml = await Promise.all(cardsHtmlPromises);
   gridEl.innerHTML = allCardsHtml.join('');
+
+  gridEl.querySelectorAll('[data-flip-card]').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const cardEl = document.getElementById(`id-card-${btn.dataset.flipCard}`);
+      if (cardEl) cardEl.classList.toggle('show-back');
+    });
+  });
 
   gridEl.querySelectorAll('[data-print-single]').forEach(btn => {
     btn.addEventListener('click', () => {
@@ -2365,7 +2427,17 @@ async function renderKartuTab(container, kelasList) {
       const siswa = store.state.siswa.find(s => s.id === btn.dataset.dlQr);
       if (siswa) {
         await downloadStudentQrCardPng(siswa);
-        toast('Kartu siswa berhasil didownload PNG', 'success');
+        toast('Kartu depan (QR) berhasil didownload PNG', 'success');
+      }
+    });
+  });
+
+  gridEl.querySelectorAll('[data-dl-back]').forEach(btn => {
+    btn.addEventListener('click', async () => {
+      const siswa = store.state.siswa.find(s => s.id === btn.dataset.dlBack);
+      if (siswa) {
+        await downloadStudentCardBackPng(siswa);
+        toast('Kartu belakang berhasil didownload PNG', 'success');
       }
     });
   });
@@ -2430,11 +2502,11 @@ function openManualAbsensiModal(siswaId = null, defaultDate = null) {
       </div>
       <div class="form-row">
         <div class="form-group">
-          <label>☀️ Jam Solat Duha (opsional)</label>
+          <label>Jam Sholat Dhuha (opsional)</label>
           <input type="text" id="modal-absen-jam-duha" value="${jamDuh}" placeholder="08:30:00" class="monospace" style="width:100%;" ${isAbsentStatus ? 'disabled' : ''}>
         </div>
         <div class="form-group">
-          <label>🕌 Jam Solat Dzuhur (opsional)</label>
+          <label>Jam Sholat Dzuhur (opsional)</label>
           <input type="text" id="modal-absen-jam-dzuhur" value="${jamDzu}" placeholder="12:15:00" class="monospace" style="width:100%;" ${isAbsentStatus ? 'disabled' : ''}>
         </div>
       </div>
@@ -2528,13 +2600,26 @@ function openManualAbsensiModal(siswaId = null, defaultDate = null) {
 
 // Print single student card
 async function printSingleCard(siswa) {
-  const cardHtml = await renderStudentCardHtml(siswa);
+  const frontCard = await renderStudentCardHtml(siswa);
+  const backCard = await renderStudentCardHtml(siswa, { side: 'back' });
   const printArea = document.getElementById('kwitansi-print-area');
   if (!printArea) return;
 
   printArea.innerHTML = `
     <div class="print-cards-container single">
-      ${cardHtml}
+      <div class="print-card-duo">
+        <div class="duo-front">
+          <div class="duo-label">TAMPAK DEPAN</div>
+          ${frontCard}
+        </div>
+        <div class="duo-fold-line" title="Garis Lipat Tengah">
+          <span>Garis Lipat</span>
+        </div>
+        <div class="duo-back">
+          <div class="duo-label">TAMPAK BELAKANG</div>
+          ${backCard}
+        </div>
+      </div>
     </div>
   `;
 
@@ -2544,21 +2629,52 @@ async function printSingleCard(siswa) {
 }
 
 // Print all / filtered student cards
-async function printCardsList(students) {
+async function printCardsList(students, mode = 'front') {
   const printArea = document.getElementById('kwitansi-print-area');
   if (!printArea) return;
 
-  toast('Menyiapkan lembar cetak kartu...', 'info');
-  const cardsHtmlPromises = students.map(s => renderStudentCardHtml(s));
-  const cardsHtml = await Promise.all(cardsHtmlPromises);
+  toast(`Menyiapkan lembar cetak kartu (${mode === 'duo' ? '2 Sisi Siap Lipat' : 'Tampak Depan'})...`, 'info');
 
-  printArea.innerHTML = `
-    <div class="print-cards-container sheet">
-      ${cardsHtml.join('')}
-    </div>
-  `;
+  if (mode === 'duo') {
+    const duosHtml = await Promise.all(students.map(async s => {
+      const front = await renderStudentCardHtml(s);
+      const back = await renderStudentCardHtml(s, { side: 'back' });
+      return `
+        <div class="print-card-duo">
+          <div class="duo-front">
+            <div class="duo-label">TAMPAK DEPAN</div>
+            ${front}
+          </div>
+          <div class="duo-fold-line" title="Garis Lipat Tengah">
+            <span>Lipat</span>
+          </div>
+          <div class="duo-back">
+            <div class="duo-label">TAMPAK BELAKANG</div>
+            ${back}
+          </div>
+        </div>
+      `;
+    }));
+
+    printArea.innerHTML = `
+      <div class="print-cards-container duo-sheet">
+        ${duosHtml.join('')}
+      </div>
+    `;
+  } else {
+    const cardsHtml = await Promise.all(students.map(s => renderStudentCardHtml(s)));
+    printArea.innerHTML = `
+      <div class="print-cards-container sheet">
+        ${cardsHtml.map(card => `
+          <div class="print-card-cut-item">
+            ${card}
+          </div>
+        `).join('')}
+      </div>
+    `;
+  }
 
   setTimeout(() => {
     window.print();
-  }, 200);
+  }, 250);
 }

@@ -5,11 +5,14 @@ import { fmtRupiah, escapeHtml, escapeAttr, formatWaLink } from '../../utils/for
 import { triggerRender } from '../../utils/events.js';
 import { getTodayDateStr, formatTimeDisplay, getStatistikAbsensi } from '../absensi/absensiService.js';
 import { openModal, closeModal } from '../../components/Modal.js';
-import { renderStudentCardHtml, downloadStudentQrCardPng } from '../absensi/qrCardGenerator.js';
+import { renderStudentCardHtml, downloadStudentQrCardPng, downloadStudentCardBackPng } from '../absensi/qrCardGenerator.js';
 import { cetakSuratBebasAdministrasi } from '../pembayaran/cetakDokumenSiswa.js';
+import { renderAvatarHtml, compressImageFile } from '../../utils/imageHelper.js';
 
 export function openStudentProfileModal(s) {
   if (!s) return;
+  let currentFoto = s.foto || '';
+
   openModal(`
     <div class="modal-head">
       <div>
@@ -21,28 +24,64 @@ export function openStudentProfileModal(s) {
     <div class="modal-body" style="max-height:72vh; overflow-y:auto; padding-right:6px;">
       <!-- Identitas Utama Readonly -->
       <div style="background:var(--paper-dim); border:1px solid var(--line); border-radius:10px; padding:12px 14px; margin-bottom:16px; display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-        <div>
-          <div style="font-size:15px; font-weight:700; color:var(--ink);">${escapeHtml(s.nama)}</div>
-          <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">
-            NIS: <strong class="monospace" style="color:var(--primary);">${escapeHtml(s.nis || '-')}</strong> • Kelas: <strong>${escapeHtml(s.kelas)}</strong>
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div id="st-prof-avatar-preview" style="flex-shrink:0;">
+            ${renderAvatarHtml({ ...s, foto: currentFoto }, 46)}
+          </div>
+          <div>
+            <div style="font-size:15px; font-weight:700; color:var(--ink);">${escapeHtml(s.nama)}</div>
+            <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">
+              NIS: <strong class="monospace" style="color:var(--primary);">${escapeHtml(s.nis || '-')}</strong> • Kelas: <strong>${escapeHtml(s.kelas)}</strong>
+            </div>
           </div>
         </div>
         <div>
-          <span class="badge ${s.rfidUid ? 'lunas' : ''}" style="font-size:11px;">
-            ${s.rfidUid ? `💳 RFID: ${escapeHtml(s.rfidUid)}` : '💳 Kartu RFID Belum Terdaftar'}
+          <span class="badge ${s.rfidUid ? 'lunas' : ''}" style="font-size:11px; display:inline-flex; align-items:center; gap:5px;">
+            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 9h6M14 12h4M14 15h6"/></svg>
+            ${s.rfidUid ? `RFID: ${escapeHtml(s.rfidUid)}` : 'Kartu RFID Belum Terdaftar'}
           </span>
         </div>
       </div>
 
       <!-- Tab Navigasi Form Profil -->
       <div class="tabs" style="margin-bottom:14px; padding:3px;">
-        <button type="button" class="tab-btn active" id="tab-btn-bio" style="font-size:12.5px; padding:6px 12px;">👤 Data Diri</button>
-        <button type="button" class="tab-btn" id="tab-btn-wali" style="font-size:12.5px; padding:6px 12px;">🏡 Orang Tua & Alamat</button>
-        <button type="button" class="tab-btn" id="tab-btn-sec" style="font-size:12.5px; padding:6px 12px;">🔒 Keamanan (PIN)</button>
+        <button type="button" class="tab-btn active" id="tab-btn-bio" style="font-size:12.5px; padding:6px 12px; display:inline-flex; align-items:center; gap:6px;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="7" r="4"/><path d="M2 21v-2a4 4 0 0 1 4-4h12a4 4 0 0 1 4 4v2"/></svg>
+          <span>Data Diri & Foto</span>
+        </button>
+        <button type="button" class="tab-btn" id="tab-btn-wali" style="font-size:12.5px; padding:6px 12px; display:inline-flex; align-items:center; gap:6px;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+          <span>Orang Tua & Alamat</span>
+        </button>
+        <button type="button" class="tab-btn" id="tab-btn-sec" style="font-size:12.5px; padding:6px 12px; display:inline-flex; align-items:center; gap:6px;">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>Keamanan (PIN)</span>
+        </button>
       </div>
 
       <!-- Section 1: Data Diri Siswa -->
       <div id="section-bio" class="st-prof-section">
+        <!-- Photo Uploader Box -->
+        <div style="display:flex; align-items:center; gap:16px; background:var(--paper); border:1px solid var(--line); border-radius:12px; padding:12px 14px; margin-bottom:16px;">
+          <div id="st-prof-avatar-large" style="flex-shrink:0;">
+            ${renderAvatarHtml({ ...s, foto: currentFoto }, 64)}
+          </div>
+          <div style="flex:1;">
+            <div style="font-weight:700; font-size:13.5px; color:var(--ink);">Foto Profil Siswa</div>
+            <div style="font-size:11.5px; color:var(--ink-soft); margin-top:1px;">Format JPG, PNG, atau WebP. Foto akan tampil di kartu pelajar digital dan presensi.</div>
+            <div style="display:flex; gap:8px; margin-top:8px;">
+              <button type="button" class="btn btn-sm btn-secondary" id="btn-upload-st-photo" style="font-size:12px; padding:5px 10px; display:inline-flex; align-items:center; gap:5px;">
+                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg>
+                <span>Upload Foto</span>
+              </button>
+              <button type="button" class="btn btn-sm btn-ghost" id="btn-remove-st-photo" style="font-size:12px; padding:5px 8px; color:#DC2626; ${currentFoto ? '' : 'display:none;'}">
+                Hapus
+              </button>
+              <input type="file" id="input-st-photo-file" accept="image/*" style="display:none;">
+            </div>
+          </div>
+        </div>
+
         <div class="form-row">
           <div class="form-group">
             <label>NISN (10 Digit Angka)</label>
@@ -140,6 +179,40 @@ export function openStudentProfileModal(s) {
   tabWali?.addEventListener('click', () => switchTab(tabWali, secWali));
   tabSec?.addEventListener('click', () => switchTab(tabSec, secSec));
 
+  // Photo handlers
+  const btnUploadPhoto = document.getElementById('btn-upload-st-photo');
+  const btnRemovePhoto = document.getElementById('btn-remove-st-photo');
+  const inputPhotoFile = document.getElementById('input-st-photo-file');
+
+  btnUploadPhoto?.addEventListener('click', () => inputPhotoFile?.click());
+
+  inputPhotoFile?.addEventListener('change', async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    try {
+      currentFoto = await compressImageFile(file, 280, 0.82);
+      const prevLg = document.getElementById('st-prof-avatar-large');
+      const prevSm = document.getElementById('st-prof-avatar-preview');
+      if (prevLg) prevLg.innerHTML = renderAvatarHtml({ ...s, foto: currentFoto }, 64);
+      if (prevSm) prevSm.innerHTML = renderAvatarHtml({ ...s, foto: currentFoto }, 46);
+      if (btnRemovePhoto) btnRemovePhoto.style.display = 'inline-block';
+      toast('Foto profil berhasil dimuat (klik Simpan untuk menyimpan)', 'info');
+    } catch (err) {
+      toast(err.message || 'Gagal memproses gambar foto', 'error');
+    }
+  });
+
+  btnRemovePhoto?.addEventListener('click', () => {
+    currentFoto = '';
+    const prevLg = document.getElementById('st-prof-avatar-large');
+    const prevSm = document.getElementById('st-prof-avatar-preview');
+    if (prevLg) prevLg.innerHTML = renderAvatarHtml({ ...s, foto: '' }, 64);
+    if (prevSm) prevSm.innerHTML = renderAvatarHtml({ ...s, foto: '' }, 46);
+    if (btnRemovePhoto) btnRemovePhoto.style.display = 'none';
+    if (inputPhotoFile) inputPhotoFile.value = '';
+    toast('Foto dihapus (klik Simpan untuk menerapkan perubahan)', 'info');
+  });
+
   document.getElementById('st-prof-show-pin')?.addEventListener('change', e => {
     const pinIn = document.getElementById('st-prof-pin');
     if (pinIn) pinIn.type = e.target.checked ? 'text' : 'password';
@@ -148,6 +221,7 @@ export function openStudentProfileModal(s) {
   document.getElementById('btn-save-st-prof')?.addEventListener('click', () => {
     const target = store.state.siswa.find(x => x.id === s.id);
     if (target) {
+      target.foto = currentFoto;
       target.nisn = document.getElementById('st-prof-nisn')?.value.trim() || '';
       target.nik = document.getElementById('st-prof-nik')?.value.trim() || '';
       target.tempatLahir = document.getElementById('st-prof-tempat-lahir')?.value.trim() || '';
@@ -177,7 +251,7 @@ function renderTopTunggakan(){
     .filter(r=>r.t.totalKurang>0)
     .sort((a,b)=>b.t.totalKurang-a.t.totalKurang)
     .slice(0,6);
-  if(rows.length===0) return `<div class="empty-state" style="padding:24px;"><p>Semua siswa lunas sampai bulan berjalan. Kerja bagus, Bu/Pak Bendahara. 🎉</p></div>`;
+  if(rows.length===0) return `<div class="empty-state" style="padding:24px;"><p>Semua siswa lunas sampai bulan berjalan.</p></div>`;
   return `<div class="table-scroll"><table><thead><tr><th>Nama</th><th>Kelas</th><th class="num">Bulan Tertunggak</th><th class="num">Kekurangan</th><th style="width:120px; text-align:right;">Aksi</th></tr></thead><tbody>
     ${rows.map(r=>`<tr>
       <td><strong>${escapeHtml(r.s.nama)}</strong></td>
@@ -234,13 +308,13 @@ export async function renderDashboard(){
         absenIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:22px;height:22px;"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>`;
         absenTitle = `Hadir Tepat Waktu — Pukul ${formatTimeDisplay(todayRecord.jamMasuk)}`;
         absenSub = todayRecord.jamPulang ? `Telah scan pulang pukul ${formatTimeDisplay(todayRecord.jamPulang)}` : 'Presensi masuk tercatat di sistem sekolah.';
-        absenBadge = '<span class="badge lunas">✓ Hadir Tepat Waktu</span>';
+        absenBadge = '<span class="badge lunas">Hadir Tepat Waktu</span>';
       } else if (todayRecord.status === 'terlambat') {
         absenClass = 'terlambat';
         absenIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:22px;height:22px;"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`;
         absenTitle = `Terlambat Masuk — Pukul ${formatTimeDisplay(todayRecord.jamMasuk)}`;
         absenSub = todayRecord.keterangan || 'Melewati batas toleransi jam masuk sekolah.';
-        absenBadge = '<span class="badge parsial">! Terlambat</span>';
+        absenBadge = '<span class="badge parsial">Terlambat</span>';
       } else if (todayRecord.status === 'izin') {
         absenClass = 'belum';
         absenTitle = 'Izin Tidak Masuk';
@@ -274,15 +348,23 @@ export async function renderDashboard(){
           </div>
         </div>
 
-        <div class="sp-body">
-          <div class="sp-student-name">${escapeHtml(s.nama)}</div>
-          <div class="sp-student-meta-row">
-            <span class="sp-pill">NIS: ${escapeHtml(s.nis || 'Belum Diatur')}</span>
-            ${s.nisn ? `<span class="sp-pill monospace">NISN: ${escapeHtml(s.nisn)}</span>` : ''}
-            <span class="sp-pill">Kelas ${escapeHtml(s.kelas)}</span>
-            <span class="sp-pill ${s.rfidUid ? 'active-status' : ''}">${s.rfidUid ? `💳 RFID: ${escapeHtml(s.rfidUid)}` : '💳 QR Ready'}</span>
-            <span class="sp-pill active-status">✓ Siswa Aktif</span>
-            <span class="sp-pill" style="opacity:0.85;">TA ${escapeHtml(tahunAjaran)}</span>
+        <div class="sp-body" style="display:flex; align-items:center; gap:16px;">
+          <div style="flex-shrink:0;">
+            ${renderAvatarHtml(s, 60, 'sp-card-avatar')}
+          </div>
+          <div style="flex:1; min-width:0;">
+            <div class="sp-student-name">${escapeHtml(s.nama)}</div>
+            <div class="sp-student-meta-row">
+              <span class="sp-pill">NIS: ${escapeHtml(s.nis || 'Belum Diatur')}</span>
+              ${s.nisn ? `<span class="sp-pill monospace">NISN: ${escapeHtml(s.nisn)}</span>` : ''}
+              <span class="sp-pill">Kelas ${escapeHtml(s.kelas)}</span>
+              <span class="sp-pill ${s.rfidUid ? 'active-status' : ''}" style="display:inline-flex; align-items:center; gap:4px;">
+                <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="5" width="20" height="14" rx="2"/><circle cx="8" cy="12" r="2"/><path d="M14 9h6M14 12h4M14 15h6"/></svg>
+                <span>${s.rfidUid ? `RFID: ${escapeHtml(s.rfidUid)}` : 'QR Ready'}</span>
+              </span>
+              <span class="sp-pill active-status">Siswa Aktif</span>
+              <span class="sp-pill" style="opacity:0.85;">TA ${escapeHtml(tahunAjaran)}</span>
+            </div>
           </div>
         </div>
 
@@ -351,8 +433,8 @@ export async function renderDashboard(){
             <div style="font-size:12.5px; color:var(--ink-soft); margin-top:2px;">${absenSub}</div>
             ${todayRecord && (todayRecord.jamDuha || todayRecord.jamDzuhur) ? `
               <div style="display:flex; gap:8px; margin-top:6px; flex-wrap:wrap;">
-                ${todayRecord.jamDuha ? `<span class="badge" style="background:#FEF3C7; color:#92400E; font-size:11px;">☀️ Solat Duha: ${formatTimeDisplay(todayRecord.jamDuha)}</span>` : ''}
-                ${todayRecord.jamDzuhur ? `<span class="badge" style="background:#DBEAFE; color:#1E40AF; font-size:11px;">🕌 Solat Dzuhur: ${formatTimeDisplay(todayRecord.jamDzuhur)}</span>` : ''}
+                ${todayRecord.jamDuha ? `<span class="badge" style="background:#FEF3C7; color:#92400E; font-size:11px;">Sholat Dhuha: ${formatTimeDisplay(todayRecord.jamDuha)}</span>` : ''}
+                ${todayRecord.jamDzuhur ? `<span class="badge" style="background:#DBEAFE; color:#1E40AF; font-size:11px;">Sholat Dzuhur: ${formatTimeDisplay(todayRecord.jamDzuhur)}</span>` : ''}
               </div>
             ` : ''}
           </div>
@@ -526,25 +608,53 @@ export async function renderDashboard(){
       const cardHtml = await renderStudentCardHtml(s);
       openModal(`
         <div class="modal-head">
-          <h3>Kartu Pelajar & QR Digital</h3>
+          <div>
+            <h3 style="margin:0;">Kartu Pelajar & QR Digital (2 Sisi)</h3>
+            <div style="font-size:12px; color:var(--ink-soft); margin-top:2px;">Dilengkapi QR presensi, identitas madrasah, & tata tertib resmi</div>
+          </div>
           <button class="close-x" id="modal-close">&times;</button>
         </div>
-        <div class="modal-body" style="display:flex; flex-direction:column; align-items:center; gap:16px; padding:20px 10px; background:var(--paper-dim);">
+        <div class="modal-body" style="display:flex; flex-direction:column; align-items:center; gap:14px; padding:20px 10px; background:var(--paper-dim);">
           <div style="transform:scale(1.05); transform-origin:center top; margin:10px 0;">
             ${cardHtml}
           </div>
-          <div style="font-size:12.5px; color:var(--ink-soft); text-align:center; max-width:320px;">
-            Arahkan kartu ke kamera pemindai gerbang sekolah atau perbesar kecerahan layar HP saat memindai.
+          <div style="display:flex; gap:8px; flex-wrap:wrap; justify-content:center;">
+            <button class="btn btn-sm btn-outline" id="btn-flip-card-view" style="display:inline-flex; align-items:center; gap:6px;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+              <span id="btn-flip-label">Balik ke Sisi Belakang (Tata Tertib)</span>
+            </button>
+          </div>
+          <div style="font-size:12px; color:var(--ink-soft); text-align:center; max-width:320px;">
+            Arahkan kartu ke pemindai gerbang sekolah atau simpan gambar PNG untuk dicetak menjadi kartu fisik.
           </div>
         </div>
-        <div class="modal-foot">
+        <div class="modal-foot" style="flex-wrap:wrap; gap:8px;">
           <button class="btn" id="modal-cancel">Tutup</button>
-          <button class="btn btn-primary" id="btn-hero-dl-qr">Simpan Kartu PNG</button>
+          <button class="btn btn-outline" id="btn-hero-dl-back">Unduh Sisi Belakang PNG</button>
+          <button class="btn btn-primary" id="btn-hero-dl-qr">Unduh Sisi Depan PNG</button>
         </div>
       `);
+
+      let isShowingBack = false;
+      document.getElementById('btn-flip-card-view')?.addEventListener('click', () => {
+        const cardEl = document.getElementById(`id-card-${s.id}`);
+        const labelEl = document.getElementById('btn-flip-label');
+        if (!cardEl) return;
+        isShowingBack = !isShowingBack;
+        cardEl.classList.toggle('show-back', isShowingBack);
+        if (labelEl) {
+          labelEl.textContent = isShowingBack ? 'Balik ke Sisi Depan (Identitas & QR)' : 'Balik ke Sisi Belakang (Tata Tertib)';
+        }
+      });
+
       document.getElementById('btn-hero-dl-qr')?.addEventListener('click', async () => {
         await downloadStudentQrCardPng(s);
-        toast('Kartu QR berhasil disimpan sebagai gambar PNG', 'success');
+        toast('Kartu depan (QR) berhasil disimpan sebagai PNG', 'success');
+      });
+
+      document.getElementById('btn-hero-dl-back')?.addEventListener('click', async () => {
+        await downloadStudentCardBackPng(s);
+        toast('Kartu belakang berhasil disimpan sebagai PNG', 'success');
       });
     });
 

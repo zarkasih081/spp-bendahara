@@ -64,12 +64,12 @@ Kepada Yth. Bapak/Ibu Wali Murid dari *${siswa.nama}*,
 Dengan hormat,
 Melalui pesan ini kami menginformasikan bahwa kami telah menerima pembayaran ${jenis==='spp'?'SPP':'Ijazah'} dengan rincian sebagai berikut:
 
-📋 *Data Siswa*
+*Data Siswa:*
 Nama  : ${siswa.nama}
 Kelas : ${siswa.kelas}
 NIS   : ${siswa.nis || '-'}
 
-📝 *Rincian Pembayaran*
+*Rincian Pembayaran:*
 No. Kuitansi : ${noKwitansi}
 Tanggal      : ${fmtDate(tanggal)}
 Pembayaran   : ${itemText}

@@ -2,7 +2,7 @@ import { store } from '../../app/state.js';
 import { saveAuth, hashPassword } from '../../data/authStorage.js';
 import { triggerRender } from '../../utils/events.js';
 import { toast } from '../../utils/helpers.js';
-import { escapeHtml } from '../../utils/formatters.js';
+import { escapeHtml, formatWaLink } from '../../utils/formatters.js';
 import { LOGO_BASE64 } from '../../utils/constants.js';
 import { openModal } from '../../components/Modal.js';
 
@@ -82,8 +82,8 @@ export function renderLogin() {
 
           <form id="form-login-siswa" class="login-form active">
             <div class="form-group form-floating">
-              <input type="text" id="login-siswa-nis" inputmode="numeric" pattern="[0-9]*" autocomplete="username" placeholder=" " required>
-              <label for="login-siswa-nis">NIS (Nomor Induk Siswa)</label>
+              <input type="text" id="login-siswa-nis" autocomplete="username" placeholder=" " required>
+              <label for="login-siswa-nis">NIS / NISN Siswa</label>
             </div>
             <div class="form-group form-floating">
               <div class="password-wrapper">
@@ -273,9 +273,13 @@ export function renderLogin() {
           return;
         }
 
-        const siswa = store.state.siswa.find(s => s.nis === nis);
+        const siswa = store.state.siswa.find(s => 
+          (s.nis && s.nis.trim() === nis) || 
+          (s.nisn && s.nisn.trim() === nis) || 
+          (s.rfidUid && s.rfidUid.trim() === nis)
+        );
         if(!siswa) {
-          toast('NIS tidak terdaftar', 'error');
+          toast('NIS / NISN tidak terdaftar di sistem', 'error');
           const nisInput = document.getElementById('login-siswa-nis');
           if(nisInput) {
             nisInput.classList.add('shake');
@@ -284,7 +288,7 @@ export function renderLogin() {
           return;
         }
 
-        const correctPin = siswa.pin || siswa.nis;
+        const correctPin = siswa.pin || siswa.nis || siswa.nisn;
         if(pin === correctPin) {
           store.ui.currentUser = { role: 'siswa', id: siswa.id, nama: siswa.nama, nis: siswa.nis, kelas: siswa.kelas };
           saveAuth(store.ui.currentUser, remember);
@@ -316,13 +320,26 @@ export function renderLogin() {
   if(lupaPin) {
     lupaPin.addEventListener('click', (e) => {
       e.preventDefault();
+      const noHp = store.state.settings.noHpBendahara;
+      const waLink = noHp ? formatWaLink(noHp, `Halo Bendahara ${store.state.settings.namaSekolah}, saya siswa/orang tua ingin meminta bantuan reset PIN login portal SPP sekolah.`) : null;
       openModal(`
-        <div class="modal-head"><h3>Lupa PIN?</h3><button class="close-x" id="modal-close">&times;</button></div>
+        <div class="modal-head"><h3>Lupa PIN Login?</h3><button class="close-x" id="modal-close">&times;</button></div>
         <div class="modal-body">
-          <p style="margin:0; font-size:14px; line-height:1.6; color:var(--ink);">Silakan hubungi Bendahara ${store.state.settings.namaSekolah} untuk melakukan reset PIN Anda.</p>
+          <p style="margin:0 0 14px 0; font-size:14px; line-height:1.6; color:var(--ink);">
+            PIN bawaan standar siswa adalah sama dengan <strong>Nomor Induk Siswa (NIS)</strong> Anda.
+          </p>
+          <div style="background:var(--paper-dim); border:1px solid var(--line); border-radius:8px; padding:10px 12px; font-size:12.5px; color:var(--ink-soft); line-height:1.5;">
+            Jika Anda sudah mengubah PIN dan lupa kombinasi barunya, silakan hubungi Bendahara Sekolah untuk mereset kata sandi Anda.
+          </div>
         </div>
-        <div class="modal-foot">
-          <button class="btn btn-primary" id="modal-cancel" style="width:100%;">Tutup</button>
+        <div class="modal-foot" style="display:flex; gap:8px;">
+          <button class="btn" id="modal-cancel" style="flex:1;">Tutup</button>
+          ${waLink ? `
+            <a href="${waLink}" target="_blank" class="btn btn-primary" style="flex:1.4; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:6px; background:#25D366; border-color:#25D366;">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+              <span>Hubungi Bendahara</span>
+            </a>
+          ` : ''}
         </div>
       `);
     });

@@ -40,43 +40,51 @@ export function cetakSuratBebasAdministrasi(siswa) {
         Yang bertanda tangan di bawah ini, Bendahara / Kepala Sekolah <strong>${escapeHtml(s.namaSekolah)}</strong>, menerangkan dengan sebenarnya bahwa:
       </p>
 
-      <table style="width:100%; border-collapse:collapse; margin-bottom:16px; font-size:13px;">
-        <tr>
-          <td style="width:160px; padding:4px 0; font-weight:600;">Nama Siswa</td>
-          <td style="width:12px; padding:4px 0;">:</td>
-          <td style="padding:4px 0; font-weight:700; color:#0f172a;">${escapeHtml(siswa.nama)}</td>
-        </tr>
-        <tr>
-          <td style="padding:4px 0; font-weight:600;">Nomor Induk Siswa (NIS)</td>
-          <td style="padding:4px 0;">:</td>
-          <td style="padding:4px 0; font-family:monospace;">${escapeHtml(siswa.nis || '-')}</td>
-        </tr>
-        <tr>
-          <td style="padding:4px 0; font-weight:600;">NISN</td>
-          <td style="padding:4px 0;">:</td>
-          <td style="padding:4px 0; font-family:monospace;">${escapeHtml(siswa.nisn || '-')}</td>
-        </tr>
-        <tr>
-          <td style="padding:4px 0; font-weight:600;">Kelas</td>
-          <td style="padding:4px 0;">:</td>
-          <td style="padding:4px 0;">${escapeHtml(siswa.kelas)}</td>
-        </tr>
-        <tr>
-          <td style="padding:4px 0; font-weight:600;">Tempat, Tgl Lahir</td>
-          <td style="padding:4px 0;">:</td>
-          <td style="padding:4px 0;">${escapeHtml(ttl)}</td>
-        </tr>
-        <tr>
-          <td style="padding:4px 0; font-weight:600;">Nama Orang Tua / Wali</td>
-          <td style="padding:4px 0;">:</td>
-          <td style="padding:4px 0;">${escapeHtml(siswa.namaWali || '-')}</td>
-        </tr>
-        <tr>
-          <td style="padding:4px 0; font-weight:600;">Alamat</td>
-          <td style="padding:4px 0;">:</td>
-          <td style="padding:4px 0;">${escapeHtml(siswa.alamat || '-')}</td>
-        </tr>
-      </table>
+      <div style="display:flex; gap:16px; align-items:flex-start; margin-bottom:16px;">
+        <table style="flex:1; border-collapse:collapse; font-size:13px;">
+          <tr>
+            <td style="width:160px; padding:4px 0; font-weight:600;">Nama Siswa</td>
+            <td style="width:12px; padding:4px 0;">:</td>
+            <td style="padding:4px 0; font-weight:700; color:#0f172a;">${escapeHtml(siswa.nama)}</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0; font-weight:600;">Nomor Induk Siswa (NIS)</td>
+            <td style="padding:4px 0;">:</td>
+            <td style="padding:4px 0; font-family:monospace;">${escapeHtml(siswa.nis || '-')}</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0; font-weight:600;">NISN</td>
+            <td style="padding:4px 0;">:</td>
+            <td style="padding:4px 0; font-family:monospace;">${escapeHtml(siswa.nisn || '-')}</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0; font-weight:600;">Kelas</td>
+            <td style="padding:4px 0;">:</td>
+            <td style="padding:4px 0;">${escapeHtml(siswa.kelas)}</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0; font-weight:600;">Tempat, Tgl Lahir</td>
+            <td style="padding:4px 0;">:</td>
+            <td style="padding:4px 0;">${escapeHtml(ttl)}</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0; font-weight:600;">Nama Orang Tua / Wali</td>
+            <td style="padding:4px 0;">:</td>
+            <td style="padding:4px 0;">${escapeHtml(siswa.namaWali || '-')}</td>
+          </tr>
+          <tr>
+            <td style="padding:4px 0; font-weight:600;">Alamat</td>
+            <td style="padding:4px 0;">:</td>
+            <td style="padding:4px 0;">${escapeHtml(siswa.alamat || '-')}</td>
+          </tr>
+        </table>
+        <div style="flex-shrink:0; width:80px; height:105px; border:1px solid #cbd5e1; border-radius:4px; padding:2px; display:flex; align-items:center; justify-content:center; background:#f8fafc;">
+          ${siswa.foto 
+            ? `<img src="${escapeAttr(siswa.foto)}" alt="Foto" style="width:100%; height:100%; object-fit:cover; border-radius:2px;">` 
+            : `<div style="font-size:10px; color:#94a3b8; text-align:center;">Pasfoto<br>3 x 4</div>`
+          }
+        </div>
+      </div>
 
       <!-- Status Pelunasan -->
       <div style="background:#f0fdf4; border:1px solid #86efac; border-radius:8px; padding:12px 16px; margin-bottom:18px;">
@@ -168,8 +176,8 @@ export function cetakKartuSppTahunan(siswa, targetTahunMulai) {
             ${isLunas ? 'LUNAS' : paid > 0 ? 'SEBAGIAN' : 'BELUM'}
           </span>
         </td>
-        <td style="padding:6px 8px; text-align:center; color:#94a3b8; font-size:11px;">
-          ${isLunas ? '✓ Sah' : '—'}
+        <td style="padding:6px 8px; text-align:center; color:#64748b; font-size:11px;">
+          ${isLunas ? 'Sah' : '—'}
         </td>
       </tr>
     `;
@@ -191,16 +199,24 @@ export function cetakKartuSppTahunan(siswa, targetTahunMulai) {
       </div>
 
       <!-- Info Siswa -->
-      <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:12px;">
-        <div>
-          <div>Nama Siswa: <strong style="font-size:13px; color:#0f172a;">${escapeHtml(siswa.nama)}</strong></div>
-          <div style="margin-top:2px;">Kelas: <strong>${escapeHtml(siswa.kelas)}</strong></div>
-          <div style="margin-top:2px;">Nama Orang Tua/Wali: <strong>${escapeHtml(siswa.namaWali || '-')}</strong></div>
+      <div style="display:flex; align-items:center; gap:14px; background:#f8fafc; border:1px solid #e2e8f0; border-radius:8px; padding:10px 14px; margin-bottom:14px; font-size:12px;">
+        <div style="flex-shrink:0; width:52px; height:68px; border:1px solid #cbd5e1; border-radius:4px; padding:2px; display:flex; align-items:center; justify-content:center; background:#fff;">
+          ${siswa.foto 
+            ? `<img src="${escapeAttr(siswa.foto)}" alt="Foto" style="width:100%; height:100%; object-fit:cover; border-radius:2px;">` 
+            : `<div style="font-size:9.5px; color:#94a3b8; text-align:center;">Foto<br>3 x 4</div>`
+          }
         </div>
-        <div>
-          <div>NIS: <strong class="monospace">${escapeHtml(siswa.nis || '-')}</strong></div>
-          <div style="margin-top:2px;">NISN: <strong class="monospace">${escapeHtml(siswa.nisn || '-')}</strong></div>
-          <div style="margin-top:2px;">Ketetapan SPP: <strong>${fmtRupiah(nominal)} / bulan</strong></div>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; flex:1;">
+          <div>
+            <div>Nama Siswa: <strong style="font-size:13px; color:#0f172a;">${escapeHtml(siswa.nama)}</strong></div>
+            <div style="margin-top:2px;">Kelas: <strong>${escapeHtml(siswa.kelas)}</strong></div>
+            <div style="margin-top:2px;">Nama Orang Tua/Wali: <strong>${escapeHtml(siswa.namaWali || '-')}</strong></div>
+          </div>
+          <div>
+            <div>NIS: <strong class="monospace">${escapeHtml(siswa.nis || '-')}</strong></div>
+            <div style="margin-top:2px;">NISN: <strong class="monospace">${escapeHtml(siswa.nisn || '-')}</strong></div>
+            <div style="margin-top:2px;">Ketetapan SPP: <strong>${fmtRupiah(nominal)} / bulan</strong></div>
+          </div>
         </div>
       </div>
 
@@ -273,3 +289,4 @@ export function cetakKartuSppTahunan(siswa, targetTahunMulai) {
     window.print();
   });
 }
+

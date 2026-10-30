@@ -750,12 +750,12 @@ Yth. Bapak/Ibu Wali Murid dari *${siswa.nama}*,
 
 Menginformasikan catatan kehadiran ananda di sekolah dengan rincian:
 
-📋 *Data Siswa*
+*Data Siswa:*
 Nama  : ${siswa.nama}
 Kelas : ${siswa.kelas}
 NIS   : ${siswa.nis || '-'}
 
-⏰ *Waktu & Status Kehadiran*
+*Waktu & Status Kehadiran:*
 Tanggal : ${parseLocalDate(record.tanggal).toLocaleDateString('id-ID', { weekday:'long', day:'numeric', month:'long', year:'numeric' })}
 Status  : *${statusTxt.toUpperCase()}* ${record.keterangan ? `(${record.keterangan})` : ''}
 ${waktuLines.length > 0 ? waktuLines.join('\n') : ''}

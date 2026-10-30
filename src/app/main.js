@@ -83,6 +83,9 @@ export function render(){
       const s = store.state.siswa.find(x => x.id === user.id) || user;
       const initials = getStudentInitials(s.nama);
       const namaSekolah = store.state.settings.namaSekolah || 'MTs Yasta Bunter';
+      const avatarEl = s.foto
+        ? `<img src="${s.foto}" alt="Avatar" style="width:100%; height:100%; object-fit:cover; border-radius:50%;">`
+        : escapeHtml(initials);
 
       topbar.innerHTML = `
         <div class="student-topbar-wrapper">
@@ -121,7 +124,7 @@ export function render(){
                 : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>'}
             </button>
             <div class="st-profile-capsule" id="btn-student-profile" style="cursor:pointer;" title="Klik untuk Profil & Ubah PIN (${escapeHtml(s.nama)})">
-              <div class="st-avatar">${initials}</div>
+              <div class="st-avatar" style="overflow:hidden; display:flex; align-items:center; justify-content:center;">${avatarEl}</div>
               <div class="st-profile-info">
                 <div class="st-name">${escapeHtml(s.nama)}</div>
                 <div class="st-meta">NIS: ${escapeHtml(s.nis || '-')} • Kelas ${escapeHtml(s.kelas || '-')}</div>
