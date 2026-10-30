@@ -737,20 +737,20 @@ export async function renderDashboard(){
 
   el.innerHTML = `
     <!-- Quick Actions Bar for Bendahara -->
-    <div style="display:flex; gap:10px; margin-bottom:22px; flex-wrap:wrap;">
-      <button class="btn btn-primary" id="btn-quick-bayar" style="display:inline-flex; align-items:center; gap:8px; padding:10px 18px; border-radius:12px; font-weight:600; box-shadow:0 4px 12px rgba(51,53,148,0.25);">
+    <div class="dashboard-quick-actions">
+      <button class="btn btn-primary" id="btn-quick-bayar">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><circle cx="12" cy="12" r="9"/><path d="M12 8v8M8 12h8"/></svg>
         <span>Input Pembayaran Siswa</span>
       </button>
-      <button class="btn" id="btn-quick-absensi" style="display:inline-flex; align-items:center; gap:8px; padding:10px 18px; border-radius:12px; font-weight:600; background:var(--paper); border:1px solid var(--line); color:var(--ink);">
+      <button class="btn btn-secondary" id="btn-quick-absensi">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>
         <span>Buka Scanner Presensi</span>
       </button>
-      <button class="btn" id="btn-quick-pengeluaran" style="display:inline-flex; align-items:center; gap:8px; padding:10px 18px; border-radius:12px; font-weight:600; background:var(--paper); border:1px solid var(--line); color:var(--ink);">
+      <button class="btn btn-secondary" id="btn-quick-pengeluaran">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
         <span>Buku Kas Keluar (BKK)</span>
       </button>
-      <button class="btn" id="btn-quick-siswa" style="display:inline-flex; align-items:center; gap:8px; padding:10px 18px; border-radius:12px; font-weight:600; background:var(--paper); border:1px solid var(--line); color:var(--ink);">
+      <button class="btn btn-secondary" id="btn-quick-siswa">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:18px;height:18px;"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c0-3.6 2.9-6.2 6.5-6.2s6.5 2.6 6.5 6.2"/><circle cx="17" cy="8.5" r="2.6"/><path d="M15.5 13.5c2.9.3 5 2.6 5 6.2"/></svg>
         <span>Daftar Siswa (${totalSiswa})</span>
       </button>
@@ -785,7 +785,7 @@ export async function renderDashboard(){
     </div>
 
     <!-- Dual Visual Analytics Charts -->
-    <div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(320px, 1fr)); gap:18px; margin-bottom:24px;">
+    <div class="dash-analytics-grid">
       <!-- Chart 1: Dual-Bar Cashflow -->
       <div class="card" style="margin-bottom:0;">
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:12px;">

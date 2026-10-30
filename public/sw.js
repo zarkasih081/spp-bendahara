@@ -1,4 +1,4 @@
-const CACHE_NAME = 'edupass-v3';
+const CACHE_NAME = 'edupass-v4';
 const urlsToCache = [
   './',
   './index.html',

@@ -1686,7 +1686,7 @@ body.kiosk-mode-active .main {
   }
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .sidebar {
     transform: translateX(-100%);
     transition: transform var(--transition-normal) cubic-bezier(0.4, 0, 0.2, 1);
@@ -1800,7 +1800,7 @@ body.kiosk-mode-active .main {
   }
 }
 
-@media (min-width: 641px) {
+@media (min-width: 769px) {
   .mobile-hamburger {
     display: none !important;
   }
@@ -5381,7 +5381,7 @@ body.dark-mode .receipt {
 }
 
 /* Mobile Sidebar Drawer Full Width & Readable Labels */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
 
   .sidebar,
   .sidebar.mobile-open {
@@ -5875,7 +5875,7 @@ body.dark-mode .time-pill-box.dzuhur.active {
   display: none;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .sidebar-close-btn {
     display: inline-flex;
     align-items: center;
@@ -5908,7 +5908,7 @@ body.dark-mode .time-pill-box.dzuhur.active {
   gap: 12px;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .topbar {
     flex-direction: column;
     align-items: stretch;
@@ -6000,7 +6000,7 @@ body.dark-mode .time-pill-box.dzuhur.active {
 }
 
 /* 3. Horizontal Scrollable Tabs on Mobile (No Horizontal Overflow) */
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .tabs {
     display: flex !important;
     width: 100% !important;
@@ -6145,7 +6145,7 @@ body.dark-mode .time-pill-box.dzuhur.active {
   flex-wrap: wrap;
 }
 
-@media (max-width: 640px) {
+@media (max-width: 768px) {
   .setting-logo-box {
     flex-direction: column;
     align-items: flex-start;
@@ -6181,5 +6181,145 @@ body.dark-mode .time-pill-box.dzuhur.active {
   .toolbar-right #btn-bulk-promote,
   .toolbar-right #btn-bulk-print-qr {
     grid-column: span 1 !important;
+  }
+}
+
+
+/* Base Dashboard Mobile & Desktop Layout Classes */
+.dashboard-quick-actions {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-bottom: 20px;
+}
+
+.dash-analytics-grid {
+  display: grid;
+  grid-template-columns: 2fr 1.2fr;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+/* ==========================================================================
+   ENHANCED MOBILE POLISH (768px and below)
+   ========================================================================== */
+@media (max-width: 768px) {
+  /* Dashboard Stat Cards 2x2 Grid */
+  .stat-row {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    margin-bottom: 16px !important;
+  }
+  .stat-card {
+    padding: 14px 12px !important;
+  }
+  .stat-num {
+    font-size: 19px !important;
+  }
+  .stat-label {
+    font-size: 11px !important;
+  }
+
+  /* Quick Actions 2x2 Grid */
+  .dashboard-quick-actions {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+    width: 100% !important;
+    margin-bottom: 18px !important;
+  }
+  .dashboard-quick-actions .btn {
+    width: 100% !important;
+    justify-content: center !important;
+    padding: 10px 8px !important;
+    font-size: 12px !important;
+    white-space: nowrap !important;
+  }
+
+  /* Analytics Grid 1 Column */
+  .dash-analytics-grid {
+    grid-template-columns: 1fr !important;
+    gap: 16px !important;
+  }
+
+  /* Siswa Toolbar Inline Search + Kelas Filter */
+  .toolbar-left {
+    display: flex !important;
+    flex-direction: row !important;
+    align-items: center !important;
+    gap: 8px !important;
+    width: 100% !important;
+  }
+  .toolbar-left input,
+  .toolbar-left .search-input {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+    width: auto !important;
+  }
+  .toolbar-left select {
+    flex: 0 0 auto !important;
+    min-width: 105px !important;
+    max-width: 48% !important;
+  }
+
+  /* Student Portal Holographic Passport Card */
+  .student-pass-card {
+    padding: 18px 16px !important;
+    border-radius: 16px !important;
+    margin-bottom: 16px !important;
+  }
+  .sp-student-name {
+    font-size: 19px !important;
+    margin-bottom: 4px !important;
+  }
+  .sp-student-meta-row {
+    gap: 6px !important;
+  }
+  .sp-pill {
+    font-size: 10.5px !important;
+    padding: 2px 8px !important;
+  }
+  .sp-footer {
+    padding-top: 12px !important;
+    gap: 8px !important;
+  }
+  .sp-fee-amount {
+    font-size: 18px !important;
+  }
+  .btn-sp-open-qr {
+    padding: 6px 12px !important;
+    font-size: 11.5px !important;
+  }
+
+  /* Student Action Grid 2 Columns */
+  .student-actions-grid {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 10px !important;
+  }
+  .action-tile-btn {
+    padding: 12px 10px !important;
+    gap: 10px !important;
+  }
+  .tile-title {
+    font-size: 13px !important;
+  }
+  .tile-sub {
+    font-size: 11px !important;
+  }
+  .student-attendance-banner {
+    padding: 14px 16px !important;
+  }
+
+  /* Table horizontally smooth */
+  .card {
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+  .table-scroll {
+    max-width: 100% !important;
+    -webkit-overflow-scrolling: touch !important;
   }
 }

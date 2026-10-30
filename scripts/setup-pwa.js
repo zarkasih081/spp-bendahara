@@ -43,7 +43,7 @@ fs.writeFileSync(path.join(publicDir, 'manifest.json'), JSON.stringify(manifest,
 
 // 3. Create sw.js (Service Worker — Network-First with Offline Cache Fallback)
 const swContent = `
-const CACHE_NAME = 'edupass-v3';
+const CACHE_NAME = 'edupass-v4';
 const urlsToCache = [
   './',
   './index.html',
