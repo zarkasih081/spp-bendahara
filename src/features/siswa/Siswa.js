@@ -143,7 +143,7 @@ export function renderSiswa(){
         <button class="close-x" id="modal-close">&times;</button>
       </div>
       <div class="modal-body" style="display:flex; flex-direction:column; align-items:center; gap:12px; padding:20px 10px; background:var(--paper-dim);">
-        <div style="transform:scale(1.02); transform-origin:center top;">
+        <div class="modal-card-scaler">
           ${cardHtml}
         </div>
         <button class="btn btn-sm btn-outline" id="btn-modal-flip" style="display:inline-flex; align-items:center; gap:6px;">

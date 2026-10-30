@@ -1,7 +1,7 @@
 import '../style.css';
 import { store } from './state.js';
 import { loadData } from '../data/database.js';
-import { renderNav, PAGE_META } from '../components/Navigation.js';
+import { renderNav, PAGE_META, iconHamburger } from '../components/Navigation.js';
 import { setupModalEvents } from '../components/Modal.js';
 import { getActiveTahunMulai, getSchoolLogo } from '../utils/helpers.js';
 import { saveAuth } from '../data/authStorage.js';
@@ -159,27 +159,36 @@ export function render(){
       // Standard Bendahara Topbar
       const meta = PAGE_META[store.ui.page] || { title: '', sub: '' };
       topbar.innerHTML = `
-        <div>
-          <h1 id="page-title">${meta.title}</h1>
-          <div class="sub" id="page-sub">${meta.sub}</div>
-        </div>
-        <div class="today" id="today-label" style="display:flex; align-items:center; gap:12px; flex-wrap:wrap;">
-          <div style="display:flex; align-items:center; gap:10px;">
-            <span style="font-size:12.5px; font-weight:600; color:var(--ink);">Tahun Ajaran ${renderTahunAjaranSelector('global-ta')}</span>
-            <span style="color:var(--ink-soft); font-size:12px;">•</span>
-            <span style="font-size:12px; color:var(--ink-soft);">${new Date().toLocaleDateString('id-ID',{weekday:'long', day:'numeric', month:'short', year:'numeric'})}</span>
-          </div>
-          <button type="button" class="btn-topbar-theme" id="btn-topbar-theme" title="Ganti Tema (Gelap / Terang)">
-            ${document.body.classList.contains('dark-mode')
-              ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>'
-              : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>'}
+        <div class="topbar-title-wrap">
+          <button class="mobile-hamburger" id="mobile-hamburger" type="button" title="Buka Menu Navigasi">
+            ${iconHamburger()}
           </button>
-          <div class="bendahara-topbar-profile" style="display:inline-flex; align-items:center; gap:8px; background:var(--paper-dim); border:1px solid var(--line); border-radius:30px; padding:3px 12px 3px 5px;">
-            <div style="width:28px; height:28px; border-radius:50%; background:linear-gradient(135deg, #1E293B, #333594); color:#fff; display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:700;">BD</div>
-            <span style="font-size:12.5px; font-weight:600; color:var(--ink);">Bendahara</span>
+          <div>
+            <h1 id="page-title">${meta.title}</h1>
+            <div class="sub" id="page-sub">${meta.sub}</div>
+          </div>
+        </div>
+        <div class="today" id="today-label">
+          <div class="today-date-info">
+            <span class="today-ta">Tahun Ajaran ${renderTahunAjaranSelector('global-ta')}</span>
+            <span class="today-sep">•</span>
+            <span class="today-date">${new Date().toLocaleDateString('id-ID',{weekday:'long', day:'numeric', month:'short', year:'numeric'})}</span>
+          </div>
+          <div class="today-actions">
+            <button type="button" class="btn-topbar-theme" id="btn-topbar-theme" title="Ganti Tema (Gelap / Terang)">
+              ${document.body.classList.contains('dark-mode')
+                ? '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><circle cx="12" cy="12" r="5"></circle><line x1="12" y1="1" x2="12" y2="3"></line><line x1="12" y1="21" x2="12" y2="23"></line><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"></line><line x1="1" y1="12" x2="3" y2="12"></line><line x1="21" y1="12" x2="23" y2="12"></line><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line></svg>'
+                : '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"></path></svg>'}
+            </button>
+            <div class="bendahara-topbar-profile">
+              <div class="bd-avatar">BD</div>
+              <span class="bd-name">Bendahara</span>
+            </div>
           </div>
         </div>
       `;
+      // Re-bind navigation hamburger click
+      renderNav();
       document.getElementById('global-ta')?.addEventListener('change', e=>{
         store.ui.activeTahunMulai = parseInt(e.target.value, 10);
         render();

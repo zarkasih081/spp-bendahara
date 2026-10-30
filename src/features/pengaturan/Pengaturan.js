@@ -44,19 +44,19 @@ export function renderPengaturan(){
       <div class="card-sub">Digunakan pada kwitansi resmi, kartu pelajar digital, dan laporan kas</div>
       
       <!-- Logo Sekolah Uploader -->
-      <div style="display:flex; align-items:center; gap:16px; background:var(--paper-dim); border:1px solid var(--line); border-radius:12px; padding:12px 16px; margin:14px 0 16px;">
-        <div style="width:68px; height:68px; border-radius:12px; border:2px solid var(--line); background:#fff; display:flex; align-items:center; justify-content:center; overflow:hidden; flex-shrink:0; box-shadow:0 2px 6px rgba(0,0,0,0.06);">
-          <img id="set-logo-preview" src="${currentLogo || LOGO_BASE64}" alt="Logo Sekolah" style="width:100%; height:100%; object-fit:contain; padding:2px;">
+      <div class="setting-logo-box">
+        <div class="setting-logo-preview-wrap">
+          <img id="set-logo-preview" src="${currentLogo || LOGO_BASE64}" alt="Logo Sekolah">
         </div>
-        <div style="flex:1;">
-          <div style="font-weight:700; font-size:13.5px; color:var(--ink);">Logo Resmi Sekolah / Madrasah</div>
-          <div style="font-size:11.5px; color:var(--ink-soft); margin-top:2px;">Tampil di Kuitansi, Kartu Pelajar Digital, BKK, dan Dokumen Resmi. Format disarankan: PNG transparan atau JPG.</div>
-          <div style="display:flex; gap:8px; margin-top:8px; flex-wrap:wrap;">
-            <button type="button" class="btn btn-sm btn-secondary" id="btn-upload-logo" style="font-size:12px; padding:5px 12px; display:inline-flex; align-items:center; gap:5px;">
+        <div class="setting-logo-info">
+          <div class="setting-logo-title">Logo Resmi Sekolah / Madrasah</div>
+          <div class="setting-logo-sub">Tampil di Kuitansi, Kartu Pelajar Digital, BKK, dan Dokumen Resmi. Format disarankan: PNG transparan atau JPG.</div>
+          <div class="setting-logo-actions">
+            <button type="button" class="btn btn-sm btn-secondary" id="btn-upload-logo" style="font-size:12px; padding:6px 12px; display:inline-flex; align-items:center; gap:5px;">
               <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path><polyline points="17 8 12 3 7 8"></polyline><line x1="12" y1="3" x2="12" y2="15"></line></svg>
               <span>Ganti Logo Sekolah</span>
             </button>
-            <button type="button" class="btn btn-sm btn-ghost" id="btn-reset-logo" style="font-size:12px; padding:5px 10px; color:var(--rust); ${currentLogo ? '' : 'display:none;'}">
+            <button type="button" class="btn btn-sm btn-ghost" id="btn-reset-logo" style="font-size:12px; padding:6px 10px; color:var(--rust); ${currentLogo ? '' : 'display:none;'}">
               Gunakan Logo Default
             </button>
             <input type="file" id="input-logo-file" accept="image/*" style="display:none;">

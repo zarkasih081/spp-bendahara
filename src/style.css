@@ -5864,3 +5864,322 @@ body.dark-mode .time-pill-box.dzuhur.active {
   font-size: 6.2px;
   color: rgba(255, 255, 255, 0.6);
 }
+
+
+/* ==========================================================================
+   MOBILE RESPONSIVENESS & TOUCH UX POLISH
+   ========================================================================== */
+
+/* 1. Mobile Sidebar Close Button (X) */
+.sidebar-close-btn {
+  display: none;
+}
+
+@media (max-width: 640px) {
+  .sidebar-close-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.12);
+    color: #FFFFFF;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    cursor: pointer;
+    margin-left: auto;
+    transition: all var(--transition-fast);
+  }
+  .sidebar-close-btn:hover,
+  .sidebar-close-btn:active {
+    background: rgba(239, 68, 68, 0.8);
+    border-color: #EF4444;
+  }
+  .sidebar-close-btn svg {
+    width: 18px;
+    height: 18px;
+  }
+}
+
+/* 2. Topbar Bendahara Inline Header (Mobile Optimized) */
+.topbar-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+@media (max-width: 640px) {
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+    padding: 14px 16px;
+  }
+
+  .topbar-title-wrap {
+    width: 100%;
+    gap: 10px;
+  }
+
+  .mobile-hamburger {
+    display: inline-flex !important;
+    align-items: center;
+    justify-content: center;
+    width: 38px;
+    height: 38px;
+    min-width: 38px;
+    border-radius: var(--radius);
+    background: var(--green);
+    color: #FFFFFF;
+    border: none;
+    cursor: pointer;
+    margin: 0;
+    flex-shrink: 0;
+    box-shadow: 0 2px 6px rgba(51, 53, 148, 0.25);
+  }
+
+  .mobile-hamburger svg {
+    width: 20px;
+    height: 20px;
+  }
+
+  .topbar .today {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+    width: 100%;
+  }
+
+  .today-date-info {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+  }
+
+  .today-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    gap: 8px;
+  }
+
+  .bendahara-topbar-profile {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    background: var(--paper-dim);
+    border: 1px solid var(--line);
+    border-radius: 20px;
+    padding: 3px 10px 3px 4px;
+    margin-left: auto;
+  }
+
+  .bd-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #1E293B, #333594);
+    color: #FFFFFF;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 10px;
+    font-weight: 700;
+  }
+
+  .bd-name {
+    font-size: 11.5px;
+    font-weight: 600;
+    color: var(--ink);
+  }
+}
+
+/* 3. Horizontal Scrollable Tabs on Mobile (No Horizontal Overflow) */
+@media (max-width: 640px) {
+  .tabs {
+    display: flex !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    overflow-x: auto !important;
+    white-space: nowrap !important;
+    -webkit-overflow-scrolling: touch !important;
+    scrollbar-width: none !important;
+    box-sizing: border-box !important;
+    padding: 4px !important;
+    gap: 4px !important;
+  }
+
+  .tabs::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .tab-btn {
+    flex-shrink: 0 !important;
+    font-size: 12px !important;
+    padding: 8px 14px !important;
+    white-space: nowrap !important;
+  }
+}
+
+/* 4. Responsive Kuitansi / Receipt */
+.receipt {
+  width: 100% !important;
+  max-width: 340px !important;
+  box-sizing: border-box !important;
+}
+
+@media (max-width: 400px) {
+  .receipt {
+    padding: 16px 14px 14px !important;
+  }
+  .receipt-row {
+    font-size: 11.5px !important;
+  }
+  .receipt-amt .amt {
+    font-size: 19px !important;
+  }
+}
+
+/* 5. Responsive Scanner Viewport */
+@media (max-width: 900px) {
+  .scanner-kiosk-layout {
+    grid-template-columns: minmax(0, 1fr) !important;
+    gap: 16px !important;
+  }
+  .qr-camera-wrapper {
+    width: 100% !important;
+    max-width: 100% !important;
+    box-sizing: border-box !important;
+  }
+}
+
+/* 6. Responsive Student Card Modal & Scaling */
+.modal-card-scaler {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  max-width: 100%;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+@media (max-width: 480px) {
+  .id-card {
+    width: 100% !important;
+    max-width: 310px !important;
+    box-sizing: border-box !important;
+  }
+  .id-card-body {
+    gap: 8px !important;
+  }
+  .id-card-info .info-val {
+    font-size: 10px !important;
+  }
+  .id-card-qr-img {
+    width: 60px !important;
+    height: 60px !important;
+  }
+}
+
+/* 7. Setting Logo Uploader Responsive Box */
+.setting-logo-box {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: var(--paper-dim);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 14px 16px;
+  margin: 14px 0 16px;
+}
+
+.setting-logo-preview-wrap {
+  width: 68px;
+  height: 68px;
+  border-radius: 12px;
+  border: 2px solid var(--line);
+  background: #FFFFFF;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.setting-logo-preview-wrap img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  padding: 2px;
+}
+
+.setting-logo-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.setting-logo-title {
+  font-weight: 700;
+  font-size: 13.5px;
+  color: var(--ink);
+}
+
+.setting-logo-sub {
+  font-size: 11.5px;
+  color: var(--ink-soft);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.setting-logo-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 10px;
+  flex-wrap: wrap;
+}
+
+@media (max-width: 640px) {
+  .setting-logo-box {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    padding: 14px;
+  }
+
+  .setting-logo-actions {
+    width: 100%;
+  }
+
+  .setting-logo-actions .btn {
+    flex: 1;
+    text-align: center;
+    justify-content: center;
+  }
+
+  /* Compact Toolbar Buttons on Siswa */
+  .toolbar-right {
+    display: grid !important;
+    grid-template-columns: repeat(2, 1fr) !important;
+    gap: 8px !important;
+  }
+
+  .toolbar-right #btn-add-siswa {
+    grid-column: span 2 !important;
+  }
+
+  .toolbar-right #btn-download-template {
+    grid-column: span 2 !important;
+  }
+
+  .toolbar-right #btn-bulk-promote,
+  .toolbar-right #btn-bulk-print-qr {
+    grid-column: span 1 !important;
+  }
+}

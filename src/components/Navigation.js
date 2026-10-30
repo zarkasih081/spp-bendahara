@@ -22,7 +22,7 @@ function iconGear(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="curren
 function iconScan(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/><rect x="7" y="7" width="10" height="10" rx="1"/></svg>`; }
 
 function iconChevronLeft(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 18l-6-6 6-6"/></svg>`; }
-function iconHamburger(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>`; }
+export function iconHamburger(){ return `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>`; }
 
 export const NAV_ITEMS = [
   { key:'dashboard', label:'Dashboard', group:'Ringkasan', icon:iconGrid() },
@@ -134,17 +134,29 @@ export function renderNav(){
     sidebar.appendChild(toggle);
   }
 
-  // Setup mobile hamburger
-  let hamburger = document.getElementById('mobile-hamburger');
-  if(!hamburger) {
-    hamburger = document.createElement('button');
-    hamburger.id = 'mobile-hamburger';
-    hamburger.className = 'mobile-hamburger';
-    hamburger.innerHTML = iconHamburger();
-    const main = document.querySelector('.main');
-    main.insertBefore(hamburger, main.firstChild);
+  // Setup mobile sidebar close button (X) inside sidebar header
+  let sidebarCloseBtn = document.getElementById('sidebar-close-btn');
+  if(!sidebarCloseBtn) {
+    sidebarCloseBtn = document.createElement('button');
+    sidebarCloseBtn.id = 'sidebar-close-btn';
+    sidebarCloseBtn.className = 'sidebar-close-btn';
+    sidebarCloseBtn.setAttribute('type', 'button');
+    sidebarCloseBtn.setAttribute('title', 'Tutup Menu Navigasi');
+    sidebarCloseBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>`;
+    const brand = sidebar.querySelector('.brand');
+    if (brand) brand.appendChild(sidebarCloseBtn);
     
-    hamburger.addEventListener('click', () => {
+    sidebarCloseBtn.addEventListener('click', () => {
+      sidebar.classList.remove('mobile-open');
+      const overlay = document.getElementById('mobile-overlay');
+      if (overlay) overlay.classList.remove('active');
+    });
+  }
+
+  // Setup mobile hamburger click handler
+  const hamburger = document.getElementById('mobile-hamburger');
+  if(hamburger) {
+    hamburger.onclick = () => {
       sidebar.classList.add('mobile-open');
       let overlay = document.getElementById('mobile-overlay');
       if(!overlay) {
@@ -158,16 +170,7 @@ export function renderNav(){
         });
       }
       overlay.classList.add('active');
-    });
-  }
-
-  // Hamburger is only for Bendahara (mobile view)
-  if (hamburger) {
-    if (!user || user.role === 'siswa' || store.ui.page === 'login') {
-      hamburger.style.display = 'none';
-    } else {
-      hamburger.style.display = '';
-    }
+    };
   }
 
   // Update sidebar footer with timestamp
